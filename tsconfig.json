@@ -19,6 +19,11 @@
       }
     ],
     "paths": {
+      "@/application/*": ["./front/application/*"],
+      "@/components/*": ["./front/components/*"],
+      "@/data/*": ["./back/data/*"],
+      "@/domain/*": ["./back/domain/*"],
+      "@/infrastructure/*": ["./back/infrastructure/*"],
       "@/*": ["./*"]
     }
   },

@@ -1,0 +1,1 @@
+export { javascriptCampaign } from "./campaign";

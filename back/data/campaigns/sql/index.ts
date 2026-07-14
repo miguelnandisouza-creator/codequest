@@ -1,0 +1,2 @@
+export { sqlCampaign } from "./campaign"
+;
