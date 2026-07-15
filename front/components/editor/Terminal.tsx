@@ -10,8 +10,8 @@ export default function Terminal({
   if (!visible) return null;
 
   return (
-    <div className="mt-8 rounded-xl bg-black p-5">
-      <p className="mb-4 text-green-400">
+    <div className="mt-8 rounded-md border border-[#26384f] bg-[#070c15] p-5">
+      <p className="cq-kicker mb-4 text-[#72e6a8]">
         Executando consulta...
       </p>
 
@@ -22,7 +22,7 @@ export default function Terminal({
               {row.map((cell, i) => (
                 <td
                   key={i}
-                  className="border border-zinc-700 px-4 py-2"
+                  className="border border-[#26384f] px-4 py-2 text-[#dbe8ff]"
                 >
                   {cell}
                 </td>

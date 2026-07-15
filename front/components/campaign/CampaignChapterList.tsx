@@ -22,27 +22,37 @@ export default function CampaignChapterList({ campaign }: Props) {
       {getSortedChapters(campaign).map((chapter) => {
         const unlocked = isChapterUnlocked(campaign, chapter, player);
         const completed = isChapterCompleted(chapter, player);
+        const completedStages = chapter.stages.filter((stage) => (
+          player.progress.completedStages.includes(stage.id)
+        )).length;
 
         const content = (
           <div
             className={[
-              "block rounded-xl border p-5 transition",
-              unlocked
-                ? "border-zinc-800 bg-zinc-900 hover:border-blue-500 hover:bg-zinc-800"
-                : "border-zinc-900 bg-zinc-900/50 opacity-60",
+              "cq-card block p-5",
+              unlocked ? "hover:border-[#5b8cff]" : "opacity-55",
             ].join(" ")}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-2xl font-bold">
-                {chapter.title}
-              </h2>
+              <div className="flex items-center gap-4">
+                <span className="cq-pixel-icon">
+                  {String(chapter.order).padStart(2, "0")}
+                </span>
+
+                <div>
+                  <p className="cq-kicker">Capitulo</p>
+                  <h2 className="cq-title mt-1 text-xl md:text-2xl">
+                    {chapter.title}
+                  </h2>
+                </div>
+              </div>
 
               <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-blue-500/10 px-3 py-1 text-sm text-blue-300">
+                <span className="cq-badge">
                   {chapter.stages.length} fases
                 </span>
 
-                <span className="rounded-full bg-zinc-800 px-3 py-1 text-sm text-zinc-300">
+                <span className="cq-badge">
                   {completed
                     ? "Concluido"
                     : unlocked
@@ -52,9 +62,26 @@ export default function CampaignChapterList({ campaign }: Props) {
               </div>
             </div>
 
-            <p className="mt-2 text-zinc-400">
+            <p className="mt-3 leading-7 text-[#93a4bd]">
               {chapter.description}
             </p>
+
+            <div className="mt-5 flex items-center gap-4">
+              <div className="cq-progress flex-1">
+                <div
+                  className="cq-progress-fill"
+                  style={{
+                    width: `${chapter.stages.length === 0
+                      ? 0
+                      : (completedStages / chapter.stages.length) * 100}%`,
+                  }}
+                />
+              </div>
+
+              <span className="font-mono text-xs text-[#93a4bd]">
+                {completedStages}/{chapter.stages.length}
+              </span>
+            </div>
           </div>
         );
 

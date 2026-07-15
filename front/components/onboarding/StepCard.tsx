@@ -13,11 +13,11 @@ export function StepCard({
   children,
 }: StepCardProps) {
   return (
-    <div className="w-full max-w-2xl rounded-3xl border border-zinc-800 bg-zinc-900 p-10 shadow-2xl">
-      <h1 className="text-4xl font-bold">{title}</h1>
+    <div className="cq-panel w-full max-w-2xl p-6 md:p-9">
+      <p className="cq-kicker">Choose your path</p>
+      <h1 className="cq-title mt-4 text-3xl md:text-4xl">{title}</h1>
 
-
-      <p className="mt-4 text-zinc-400">
+      <p className="mt-4 text-sm leading-6 text-[#93a4bd] md:text-base">
         {description}
       </p>
 

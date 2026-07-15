@@ -4,7 +4,7 @@ import { Reward } from "@/domain/entities/reward";
 export const initialPlayer: Player = {
   id: "player-1",
   name: "Aventureiro",
-  avatar: "dev",
+  avatar: "avatar-forge-guardian",
   xp: 0,
   level: 1,
   coins: 0,
@@ -17,6 +17,10 @@ export const initialPlayer: Player = {
     completedStages: [],
     totalXP: 0,
     level: 1,
+  },
+  inventory: {
+    ownedRewardIds: ["avatar-forge-guardian"],
+    equippedAvatarId: "avatar-forge-guardian",
   },
 };
 

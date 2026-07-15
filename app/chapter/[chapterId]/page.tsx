@@ -11,7 +11,6 @@ type Props = {
 
 export default async function ChapterPage({ params }: Props) {
   const { chapterId } = await params;
-
   const chapter = getChapter(chapterId);
 
   if (!chapter) {
@@ -19,16 +18,21 @@ export default async function ChapterPage({ params }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-10 text-white">
-      <h1 className="text-5xl font-bold">
-        {chapter.title}
-      </h1>
+    <main className="cq-page">
+      <section className="cq-shell">
+        <div className="cq-panel p-6 md:p-8">
+          <p className="cq-kicker">Menu de missoes</p>
+          <h1 className="cq-title mt-3 text-4xl md:text-6xl">
+            {chapter.title}
+          </h1>
 
-      <p className="mt-4 text-zinc-400">
-        {chapter.description}
-      </p>
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-[#93a4bd]">
+            {chapter.description}
+          </p>
+        </div>
 
-      <ChapterStageList chapter={chapter} />
+        <ChapterStageList chapter={chapter} />
+      </section>
     </main>
   );
 }

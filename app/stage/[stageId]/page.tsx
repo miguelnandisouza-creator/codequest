@@ -14,7 +14,6 @@ type Props = {
 
 export default async function StagePage({ params }: Props) {
   const { stageId } = await params;
-
   const stage = getStage(stageId);
   const navigation = getStageNavigation(stageId);
   const campaign = stage ? getCampaign(stage.campaignId) : undefined;
@@ -25,14 +24,16 @@ export default async function StagePage({ params }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-6 text-white md:p-10">
-      <AdventureEngine
-        campaign={campaign}
-        chapter={chapter}
-        stage={stage}
-        chapterId={navigation.chapterId}
-        nextStageId={navigation.nextStageId}
-      />
+    <main className="cq-page">
+      <section className="cq-shell">
+        <AdventureEngine
+          campaign={campaign}
+          chapter={chapter}
+          stage={stage}
+          chapterId={navigation.chapterId}
+          nextStageId={navigation.nextStageId}
+        />
+      </section>
     </main>
   );
 }

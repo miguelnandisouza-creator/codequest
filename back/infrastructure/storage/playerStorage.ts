@@ -3,30 +3,62 @@ import { initialPlayer } from "@/domain/game/playerProgress";
 
 const STORAGE_KEY = "codequest-player";
 
-export function loadPlayer(): Player {
+export function loadPlayer(userId?: string | null): Player {
   if (typeof window === "undefined") {
     return initialPlayer;
   }
 
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const stored = window.localStorage.getItem(getStorageKey(userId));
 
   if (!stored) {
-    return initialPlayer;
+    const legacyStored = userId
+      ? window.localStorage.getItem(STORAGE_KEY)
+      : null;
+
+    if (!legacyStored) {
+      return initialPlayer;
+    }
+
+    return parsePlayer(legacyStored);
   }
 
+  return parsePlayer(stored);
+}
+
+export function savePlayer(player: Player, userId?: string | null) {
+  window.localStorage.setItem(
+    getStorageKey(userId),
+    JSON.stringify(player)
+  );
+}
+
+function getStorageKey(userId?: string | null) {
+  return userId ? `${STORAGE_KEY}:${userId}` : STORAGE_KEY;
+}
+
+function parsePlayer(stored: string) {
   try {
+    const parsed = JSON.parse(stored) as Partial<Player>;
+
+    const inventory = {
+      ...initialPlayer.inventory,
+      ...parsed.inventory,
+      ownedRewardIds: Array.from(new Set([
+        ...initialPlayer.inventory.ownedRewardIds,
+        ...(parsed.inventory?.ownedRewardIds ?? []),
+      ])),
+    };
+
     return {
       ...initialPlayer,
-      ...JSON.parse(stored),
+      ...parsed,
+      inventory,
+      progress: {
+        ...initialPlayer.progress,
+        ...parsed.progress,
+      },
     };
   } catch {
     return initialPlayer;
   }
-}
-
-export function savePlayer(player: Player) {
-  window.localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(player)
-  );
 }

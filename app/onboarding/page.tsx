@@ -1,24 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
+import { ProgressBar } from "@/components/onboarding/ProgressBar";
+import { StepCard } from "@/components/onboarding/StepCard";
 import {
   getLanguageOptions,
   OnboardingAnswers,
   onboardingSteps,
 } from "@/data/onboarding";
-import { StepCard } from "@/components/onboarding/StepCard";
-import { ProgressBar } from "@/components/onboarding/ProgressBar";
 
 export default function OnboardingPage() {
   const router = useRouter();
-
   const data = onboardingSteps;
-
   const [step, setStep] = useState(0);
-
   const [answers, setAnswers] = useState<OnboardingAnswers>({
     goal: "",
     language: "",
@@ -67,7 +64,7 @@ export default function OnboardingPage() {
     : currentStep.options;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-zinc-950 p-6 text-white">
+    <main className="cq-page flex items-center justify-center p-5 md:p-6">
       <StepCard
         title={currentStep.title}
         description={currentStep.description}
@@ -82,8 +79,9 @@ export default function OnboardingPage() {
             <button
               key={option}
               onClick={() => select(option)}
-              className="w-full rounded-xl bg-zinc-800 p-4 text-left transition hover:bg-blue-600"
+              className="cq-menu-option"
             >
+              <span className="mr-3 text-[#72e6a8]">{">"}</span>
               {option}
             </button>
           ))}
@@ -92,7 +90,7 @@ export default function OnboardingPage() {
         <div className="mt-6 text-center">
           <Link
             href="/dashboard"
-            className="text-sm font-semibold text-blue-300 hover:text-blue-200"
+            className="font-mono text-xs font-bold uppercase tracking-[0.08em] text-[#9ec0ff] hover:text-white"
           >
             Pular e abrir campanhas
           </Link>

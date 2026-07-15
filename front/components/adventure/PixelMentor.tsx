@@ -46,10 +46,10 @@ export default function PixelMentor({
   }, [advance]);
 
   return (
-    <div className="rounded-xl border border-blue-500/20 bg-zinc-950 p-4 shadow-2xl md:p-5">
+    <div className="cq-card p-4 md:p-5">
       <div className="flex flex-col gap-5 md:flex-row">
         <div className="shrink-0 md:w-36">
-          <div className="relative mx-auto aspect-square w-28 overflow-hidden rounded-lg border border-blue-500/40 bg-blue-950/30 shadow-[0_0_30px_rgba(59,130,246,0.22)] md:w-36">
+          <div className="relative mx-auto aspect-square w-28 overflow-hidden rounded-md border border-[#5b8cff]/40 bg-[#0b1322] md:w-36">
             <Image
               src="/assets/characters/byte-wizard.png"
               alt="Byte, mentor do CodeQuest"
@@ -60,16 +60,16 @@ export default function PixelMentor({
             />
           </div>
 
-          <p className="mt-2 text-center text-xs font-semibold uppercase text-blue-300">
+          <p className="cq-kicker mt-2 text-center">
             Byte
           </p>
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-2xl font-bold">{title}</h2>
+            <h2 className="cq-title text-2xl">{title}</h2>
 
-            <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-300">
+            <span className="cq-badge">
               Narracao
             </span>
           </div>
@@ -84,11 +84,11 @@ export default function PixelMentor({
                 advance();
               }
             }}
-            className="mt-4 min-h-36 cursor-pointer rounded-lg border border-zinc-700 bg-zinc-900 p-5 text-lg leading-8 text-zinc-200 outline-none transition hover:border-blue-500 focus:border-blue-500"
+            className="mt-4 min-h-36 cursor-pointer rounded-md border border-[#26384f] bg-[#0d1422] p-5 text-lg leading-8 text-[#dbe8ff] outline-none transition hover:border-[#5b8cff] focus:border-[#5b8cff]"
           >
             <p>{currentLine}</p>
 
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-4 text-sm text-zinc-500">
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-4 font-mono text-sm text-[#93a4bd]">
               <span>
                 Fala {lineIndex + 1} de {lines.length}
               </span>

@@ -135,3 +135,17 @@ export function getRecommendedCampaignIds(answers: Partial<OnboardingAnswers>) {
     ...goalIds.filter((id) => id !== languageId),
   ];
 }
+
+export function getSelectedCampaignIds(answers: Partial<OnboardingAnswers>) {
+  const languageId = answers.language
+    ? languageCampaignId[answers.language]
+    : undefined;
+
+  if (languageId) {
+    return [languageId];
+  }
+
+  return (answers.goal ? getLanguageOptions(answers.goal) : [])
+    .map((language) => languageCampaignId[language])
+    .filter((id): id is string => Boolean(id));
+}

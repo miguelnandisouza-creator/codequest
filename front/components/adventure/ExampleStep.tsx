@@ -18,26 +18,26 @@ export default function ExampleStep({
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold">{title}</h2>
+        <h2 className="cq-title text-2xl">{title}</h2>
 
-        <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-300">
+        <span className="cq-badge">
           Exemplo
         </span>
       </div>
 
-      <p className="mt-4">{explanation}</p>
+      <p className="mt-4 leading-7 text-[#c8d3e3]">{explanation}</p>
 
-      <pre className="mt-6 overflow-auto rounded-lg bg-black p-5">
+      <pre className="mt-6 overflow-auto rounded-md border border-[#26384f] bg-[#070c15] p-5 text-[#dbe8ff]">
         <code>{code}</code>
       </pre>
 
-      <div className="mt-5 rounded-lg bg-zinc-800 p-4 text-green-400">
+      <div className="mt-5 rounded-md border border-[#72e6a8]/30 bg-[#72e6a8]/10 p-4 text-[#b8ffd1]">
         {result}
       </div>
 
       <button
         onClick={onNext}
-        className="mt-8 rounded-lg bg-blue-600 px-6 py-3 hover:bg-blue-700"
+        className="cq-button mt-8"
       >
         {nextLabel}
       </button>

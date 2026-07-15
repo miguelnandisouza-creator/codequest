@@ -1,0 +1,52 @@
+import { readStoredUsers } from "@/infrastructure/auth/userStore";
+
+export async function POST(request: Request) {
+  const formData = await request.formData();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const users = await readStoredUsers();
+  const user = users.find((storedUser) => (
+    storedUser.email === email &&
+    storedUser.password === password
+  ));
+
+  if (!user) {
+    return authError("Email ou senha invalidos.");
+  }
+
+  const session = {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    startedAt: new Date().toISOString(),
+  };
+
+  return new Response(
+    `<!doctype html><meta charset="utf-8"><script>
+      const user = ${JSON.stringify(user)};
+      const session = ${JSON.stringify(session)};
+      const usersKey = "codequest-users";
+      const currentUsers = JSON.parse(localStorage.getItem(usersKey) || "[]");
+      const nextUsers = [...currentUsers.filter((item) => item.id !== user.id), user];
+      localStorage.setItem(usersKey, JSON.stringify(nextUsers));
+      localStorage.setItem("codequest-session", JSON.stringify(session));
+      location.replace("/dashboard");
+    </script>`,
+    {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+      },
+    }
+  );
+}
+
+function authError(message: string) {
+  return new Response(
+    `<!doctype html><meta charset="utf-8"><script>alert(${JSON.stringify(message)});history.back();</script>`,
+    {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+      },
+    }
+  );
+}

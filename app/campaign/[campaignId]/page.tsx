@@ -11,7 +11,6 @@ type Props = {
 
 export default async function CampaignPage({ params }: Props) {
   const { campaignId } = await params;
-
   const campaign = getCampaign(campaignId);
 
   if (!campaign) {
@@ -19,18 +18,23 @@ export default async function CampaignPage({ params }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-10 text-white">
-      <div className="text-6xl">{campaign.icon}</div>
+    <main className="cq-page">
+      <section className="cq-shell">
+        <div className="cq-panel p-6 md:p-8">
+          <span className="cq-pixel-icon">{campaign.icon}</span>
 
-      <h1 className="mt-4 text-5xl font-bold">
-        {campaign.title}
-      </h1>
+          <p className="cq-kicker mt-5">Campanha</p>
+          <h1 className="cq-title mt-3 text-4xl md:text-6xl">
+            {campaign.title}
+          </h1>
 
-      <p className="mt-3 text-zinc-400">
-        {campaign.description}
-      </p>
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-[#93a4bd]">
+            {campaign.description}
+          </p>
+        </div>
 
-      <CampaignChapterList campaign={campaign} />
+        <CampaignChapterList campaign={campaign} />
+      </section>
     </main>
   );
 }

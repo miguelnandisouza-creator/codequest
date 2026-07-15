@@ -11,14 +11,14 @@ export function ProgressBar({
 
   return (
     <div className="mb-8">
-      <div className="mb-2 flex justify-between text-sm text-zinc-400">
+      <div className="mb-2 flex justify-between font-mono text-xs uppercase tracking-[0.12em] text-[#93a4bd]">
         <span>Etapa {current + 1}</span>
         <span>{total}</span>
       </div>
 
-      <div className="h-3 w-full rounded-full bg-zinc-800">
+      <div className="cq-progress w-full">
         <div
-          className="h-3 rounded-full bg-blue-600 transition-all duration-500"
+          className="cq-progress-fill transition-all duration-500"
           style={{ width: `${progress}%` }}
         />
       </div>

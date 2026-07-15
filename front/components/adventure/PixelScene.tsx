@@ -63,7 +63,7 @@ export default function PixelScene({
   const shouldAnimate = resolved && !isLocked;
 
   return (
-    <section className="mb-8 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+    <section className="cq-panel mb-8 overflow-hidden">
       <div className="relative min-h-[420px] overflow-hidden md:min-h-[520px]">
         <Image
           src={scene.image}
@@ -95,8 +95,8 @@ export default function PixelScene({
         />
 
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-5">
-          <div className="max-w-xl rounded-lg border border-white/10 bg-black/45 px-4 py-3 shadow-xl backdrop-blur-sm">
-            <p className={`text-xs font-bold uppercase tracking-[0.18em] ${scene.accent}`}>
+          <div className="max-w-xl rounded-md border border-white/10 bg-black/50 px-4 py-3 backdrop-blur-sm">
+            <p className={`font-mono text-xs font-bold uppercase tracking-[0.14em] ${scene.accent}`}>
               {isLocked
                 ? "Caminho bloqueado"
                 : resolved || isCompleted
@@ -112,8 +112,8 @@ export default function PixelScene({
             </p>
           </div>
 
-          <div className="hidden rounded-lg border border-white/10 bg-black/45 px-4 py-3 text-right backdrop-blur-sm md:block">
-            <p className="text-xs uppercase tracking-[0.18em] text-zinc-400">
+          <div className="hidden rounded-md border border-white/10 bg-black/50 px-4 py-3 text-right backdrop-blur-sm md:block">
+            <p className="font-mono text-xs uppercase tracking-[0.12em] text-zinc-400">
               {stage.type}
             </p>
             <p className="mt-1 text-sm font-semibold text-zinc-100">
@@ -123,12 +123,12 @@ export default function PixelScene({
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 p-5">
-          <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-black/55 p-4 shadow-2xl backdrop-blur-md md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-4 rounded-md border border-white/10 bg-black/60 p-4 backdrop-blur-md md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-200">
+              <p className="font-mono text-xs font-bold uppercase tracking-[0.14em] text-blue-200">
                 {stage.chapterId.replace("sql-chapter-", "Modulo ")}
               </p>
-              <h2 className="mt-2 text-3xl font-bold text-white md:text-4xl">
+              <h2 className="cq-title mt-2 text-3xl text-white md:text-4xl">
                 {stage.title}
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300 md:text-base">
@@ -370,7 +370,7 @@ function StoryEffect({
   if (effect === "table" || effect === "columns") {
     return (
       <div className="pointer-events-none absolute left-[13%] top-[26%] w-[min(25rem,42vw)] rounded-md border border-cyan-200/35 bg-zinc-950/70 p-3 shadow-[0_0_34px_rgba(34,211,238,0.22)] backdrop-blur-[2px] animate-cq-rise">
-        <div className="mb-2 flex items-center justify-between border-b border-cyan-200/20 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100">
+        <div className="mb-2 flex items-center justify-between border-b border-cyan-200/20 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-100">
           <span>clientes</span>
           <span>{effect === "columns" ? "colunas escolhidas" : "linhas e colunas"}</span>
         </div>
@@ -470,8 +470,8 @@ function StoryEffect({
   if (effect === "aggregate" || effect === "group" || effect === "having") {
     return (
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-[42%] top-[23%] rounded-xl border border-teal-200/40 bg-teal-950/60 px-6 py-4 text-center text-teal-100 shadow-[0_0_50px_rgba(45,212,191,0.35)] animate-cq-rise">
-          <p className="text-xs uppercase tracking-[0.2em]">{effect === "having" ? "HAVING" : effect === "group" ? "GROUP BY" : "SUM / AVG"}</p>
+        <div className="absolute left-[42%] top-[23%] rounded-md border border-teal-200/40 bg-teal-950/60 px-6 py-4 text-center text-teal-100 shadow-[0_0_50px_rgba(45,212,191,0.35)] animate-cq-rise">
+          <p className="font-mono text-xs uppercase tracking-[0.12em]">{effect === "having" ? "HAVING" : effect === "group" ? "GROUP BY" : "SUM / AVG"}</p>
           <div className="mt-3 flex h-20 items-end gap-2">
             {[35, 58, 44, 76, 62].map((height, index) => (
               <span
@@ -540,7 +540,7 @@ function RuneBurst({
 
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div className={`rounded-xl border px-7 py-5 text-2xl font-black tracking-[0.18em] animate-cq-rune ${color}`}>
+      <div className={`rounded-md border px-7 py-5 font-mono text-2xl font-black tracking-[0.12em] animate-cq-rune ${color}`}>
         {symbol}
       </div>
     </div>

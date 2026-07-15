@@ -19,4 +19,27 @@ export type Player = {
   achievements: Achievement[];
 
   progress: Progress;
+
+  updatedAt?: string;
+
+  inventory: {
+    ownedRewardIds: string[];
+    equippedAvatarId?: string;
+    equippedPetId?: string;
+    equippedThemeId?: string;
+    equippedFrameId?: string;
+    equippedEffectId?: string;
+  };
+
+  surpriseExam?: {
+    id: string;
+    title: string;
+    question: string;
+    options: string[];
+    correctAnswer: string;
+    rewardXp: number;
+    rewardCoins: number;
+    assignedAt: string;
+    completedAt?: string;
+  };
 };

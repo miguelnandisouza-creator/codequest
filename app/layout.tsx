@@ -17,7 +17,7 @@ export default function RootLayout({
       lang="pt-BR"
       className="h-full antialiased"
     >
-      <body className="min-h-full flex flex-col bg-zinc-950">
+      <body className="flex min-h-full flex-col bg-[#080d16]">
         <AppShell>{children}</AppShell>
       </body>
     </html>

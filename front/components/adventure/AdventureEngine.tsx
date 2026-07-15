@@ -36,7 +36,7 @@ export default function AdventureEngine({
   const [completed, setCompleted] = useState(false);
   const [sceneResolved, setSceneResolved] = useState(false);
   const sceneRef = useRef<HTMLDivElement>(null);
-  const { player, completeStage } = usePlayer();
+  const { player, completeStage, celebratePet } = usePlayer();
 
   const current = stage.content[step];
   const isLastStep = step === stage.content.length - 1;
@@ -56,11 +56,13 @@ export default function AdventureEngine({
     }
 
     completeStage(stage.id, stage.reward);
+    celebratePet();
     setSceneResolved(true);
     setCompleted(true);
   }
 
   function resolveScene() {
+    celebratePet();
     setSceneResolved(true);
     window.requestAnimationFrame(() => {
       sceneRef.current?.scrollIntoView({
@@ -81,29 +83,29 @@ export default function AdventureEngine({
       </div>
 
       {!unlocked ? (
-        <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-6">
-          <h2 className="text-2xl font-bold">
+        <div className="cq-panel border-yellow-300/40 p-6">
+          <h2 className="cq-title text-2xl">
             Fase bloqueada
           </h2>
 
-          <p className="mt-3 text-zinc-300">
+          <p className="mt-3 text-[#c8d3e3]">
             Conclua as fases anteriores para liberar este desafio.
           </p>
 
           <Link
             href={`/chapter/${chapterId}`}
-            className="mt-6 inline-block rounded-lg bg-zinc-800 px-5 py-3 font-semibold hover:bg-zinc-700"
+            className="cq-button cq-button-secondary mt-6"
           >
             Voltar ao capitulo
           </Link>
         </div>
       ) : completed ? (
-        <div className="rounded-xl border border-green-500/40 bg-green-500/10 p-6">
-          <h2 className="text-2xl font-bold">
+        <div className="cq-panel border-green-300/40 p-6">
+          <h2 className="cq-title text-2xl">
             Etapa concluida
           </h2>
 
-          <p className="mt-3 text-zinc-300">
+          <p className="mt-3 text-[#c8d3e3]">
             Voce recebeu {stage.reward.xp} XP e {stage.reward.coins} moedas.
           </p>
 
@@ -111,7 +113,7 @@ export default function AdventureEngine({
             {nextStageId && (
               <Link
                 href={`/stage/${nextStageId}`}
-                className="rounded-lg bg-blue-600 px-5 py-3 font-semibold hover:bg-blue-700"
+                className="cq-button"
               >
                 Proxima fase
               </Link>
@@ -119,14 +121,14 @@ export default function AdventureEngine({
 
             <Link
               href={`/chapter/${chapterId}`}
-              className="rounded-lg bg-zinc-800 px-5 py-3 font-semibold hover:bg-zinc-700"
+              className="cq-button cq-button-secondary"
             >
               Voltar ao capitulo
             </Link>
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-xl md:p-8">
+        <div className="cq-panel p-6 md:p-8">
           {current.type === "text" && (
             <TextStep
               title={current.title}

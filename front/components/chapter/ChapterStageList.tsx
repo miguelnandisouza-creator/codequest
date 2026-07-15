@@ -19,12 +19,12 @@ export default function ChapterStageList({ chapter }: Props) {
 
   if (stages.length === 0) {
     return (
-      <div className="mt-10 rounded-xl bg-zinc-900 p-6">
-        <h2 className="text-2xl font-semibold">
+      <div className="cq-panel mt-10 p-6">
+        <h2 className="cq-title text-2xl">
           Ainda nao existem fases neste capitulo.
         </h2>
 
-        <p className="mt-2 text-zinc-400">
+        <p className="mt-2 text-[#93a4bd]">
           Vamos criar a primeira fase agora.
         </p>
       </div>
@@ -40,23 +40,30 @@ export default function ChapterStageList({ chapter }: Props) {
         const content = (
           <div
             className={[
-              "block rounded-xl border p-5 transition",
-              unlocked
-                ? "border-zinc-800 bg-zinc-900 hover:border-blue-500 hover:bg-zinc-800"
-                : "border-zinc-900 bg-zinc-900/50 opacity-60",
+              "cq-card block p-5",
+              unlocked ? "hover:border-[#5b8cff]" : "opacity-55",
             ].join(" ")}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-2xl font-bold">
-                {stage.order}. {stage.title}
-              </h2>
+              <div className="flex items-center gap-4">
+                <span className="cq-pixel-icon">
+                  {String(stage.order).padStart(2, "0")}
+                </span>
+
+                <div>
+                  <p className="cq-kicker">Missao</p>
+                  <h2 className="cq-title mt-1 text-xl md:text-2xl">
+                    {stage.title}
+                  </h2>
+                </div>
+              </div>
 
               <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-zinc-800 px-3 py-1 text-sm uppercase text-zinc-300">
+                <span className="cq-badge">
                   {stage.type}
                 </span>
 
-                <span className="rounded-full bg-blue-500/10 px-3 py-1 text-sm text-blue-300">
+                <span className="cq-badge">
                   {status === "completed"
                     ? "Concluida"
                     : status === "current"
@@ -66,11 +73,11 @@ export default function ChapterStageList({ chapter }: Props) {
               </div>
             </div>
 
-            <p className="mt-2 text-zinc-400">
+            <p className="mt-3 leading-7 text-[#93a4bd]">
               {stage.description}
             </p>
 
-            <p className="mt-3 text-sm text-green-400">
+            <p className="mt-3 font-mono text-sm text-[#72e6a8]">
               {stage.reward.xp} XP / {stage.reward.coins} moedas
             </p>
           </div>

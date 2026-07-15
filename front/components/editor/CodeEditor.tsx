@@ -26,6 +26,7 @@ export function CodeEditor({
           enabled: false,
         },
         fontSize: 16,
+        fontFamily: "Cascadia Code, Consolas, monospace",
         roundedSelection: true,
         automaticLayout: true,
       }}

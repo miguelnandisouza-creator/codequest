@@ -7,17 +7,18 @@ import { usePlayer } from "@/application/hooks/usePlayer";
 import { campaigns } from "@/data/campaigns";
 import {
   getRecommendedCampaignIds,
+  getSelectedCampaignIds,
   OnboardingAnswers,
   planDetails,
 } from "@/data/onboarding";
 import { hasCompletedStage } from "@/domain/game/playerProgress";
 
 const cardAccents: Record<string, string> = {
-  sql: "from-blue-500/25 via-cyan-500/10 to-zinc-900",
-  javascript: "from-yellow-400/25 via-amber-500/10 to-zinc-900",
-  python: "from-emerald-400/25 via-blue-500/10 to-zinc-900",
-  java: "from-orange-500/25 via-red-500/10 to-zinc-900",
-  csharp: "from-purple-500/25 via-fuchsia-500/10 to-zinc-900",
+  sql: "border-blue-400/55",
+  javascript: "border-yellow-300/55",
+  python: "border-emerald-300/55",
+  java: "border-orange-300/55",
+  csharp: "border-purple-300/55",
 };
 
 function subscribeToOnboardingStorage(callback: () => void) {
@@ -60,7 +61,10 @@ export default function DashboardPage() {
   }, [onboardingSnapshot]);
 
   const visibleCampaigns = useMemo(() => {
-    const recommendedIds = getRecommendedCampaignIds(onboarding ?? {});
+    const selectedIds = getSelectedCampaignIds(onboarding ?? {});
+    const recommendedIds = selectedIds.length > 0
+      ? selectedIds
+      : getRecommendedCampaignIds(onboarding ?? {});
 
     if (recommendedIds.length === 0) {
       return campaigns;
@@ -76,44 +80,44 @@ export default function DashboardPage() {
     : undefined;
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-6 py-10 text-white md:px-10">
-      <section className="mx-auto max-w-7xl">
+    <main className="cq-page">
+      <section className="cq-shell">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-300">
+            <p className="cq-kicker">
               Mapa de campanhas
             </p>
 
-            <h1 className="mt-3 text-5xl font-black tracking-tight md:text-6xl">
+            <h1 className="cq-title mt-3 text-4xl md:text-6xl">
               Bem-vindo ao CodeQuest
             </h1>
 
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-zinc-400">
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[#93a4bd] md:text-lg">
               {onboarding?.goal && onboarding.language
                 ? `Seu caminho: ${onboarding.goal.toLowerCase()} com ${onboarding.language}.`
                 : "Escolha uma campanha, avance por modulos, derrote bosses e transforme codigo em progresso real."}
             </p>
           </div>
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-            <p className="text-sm uppercase tracking-[0.16em] text-zinc-500">
+          <div className="cq-panel min-w-56 p-5">
+            <p className="cq-kicker">
               Progresso total
             </p>
-            <p className="mt-2 text-3xl font-bold">
+            <p className="mt-2 font-mono text-3xl font-black">
               Nivel {player.level}
             </p>
-            <p className="mt-1 text-sm text-zinc-400">
+            <p className="mt-1 text-sm text-[#93a4bd]">
               {player.xp} XP / {player.coins} moedas
             </p>
           </div>
         </div>
 
         {plan && (
-          <div className="mt-8 rounded-xl border border-blue-500/30 bg-blue-500/10 p-5">
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-blue-200">
+          <div className="cq-panel mt-8 p-5">
+            <p className="cq-kicker">
               {plan.title}
             </p>
-            <p className="mt-2 max-w-4xl leading-7 text-zinc-300">
+            <p className="mt-2 max-w-4xl leading-7 text-[#c8d3e3]">
               {plan.description}
             </p>
           </div>
@@ -122,17 +126,19 @@ export default function DashboardPage() {
         {onboarding?.goal && (
           <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-zinc-500">
+              <p className="cq-kicker">
                 Campanhas recomendadas
               </p>
-              <p className="mt-1 text-zinc-400">
-                Filtradas pelo objetivo escolhido no onboarding.
+              <p className="mt-1 text-[#93a4bd]">
+                {onboarding?.language
+                  ? "Mostrando o curso escolhido no onboarding."
+                  : "Filtradas pelo objetivo escolhido no onboarding."}
               </p>
             </div>
 
             <Link
               href="/onboarding"
-              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-200 hover:border-blue-400 hover:text-white"
+              className="cq-button cq-button-secondary"
             >
               Refazer perguntas
             </Link>
@@ -154,44 +160,42 @@ export default function DashboardPage() {
                 key={campaign.id}
                 href={`/campaign/${campaign.id}`}
                 className={[
-                  "group relative min-h-72 overflow-hidden rounded-xl border border-zinc-800 bg-gradient-to-br p-6 shadow-xl transition hover:-translate-y-1 hover:border-blue-400",
-                  cardAccents[campaign.id] ?? "from-blue-500/20 to-zinc-900",
+                  "cq-card group relative min-h-72 overflow-hidden p-6",
+                  cardAccents[campaign.id] ?? "border-blue-400/45",
                 ].join(" ")}
               >
-                <div className="absolute -right-10 -top-10 size-36 rounded-full bg-white/5 transition group-hover:scale-125" />
-
                 <div className="relative flex h-full flex-col">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm font-black tracking-[0.2em] text-blue-200">
+                    <span className="cq-pixel-icon">
                       {campaign.icon}
                     </span>
 
-                    <span className="text-sm text-zinc-400">
+                    <span className="font-mono text-sm text-[#93a4bd]">
                       {completed}/{stages.length}
                     </span>
                   </div>
 
-                  <h2 className="mt-8 text-3xl font-black">
+                  <h2 className="cq-title mt-8 text-2xl">
                     {campaign.title}
                   </h2>
 
-                  <p className="mt-3 leading-7 text-zinc-300">
+                  <p className="mt-3 leading-7 text-[#c8d3e3]">
                     {campaign.description}
                   </p>
 
-                  <p className="mt-5 text-sm text-zinc-500">
+                  <p className="mt-5 font-mono text-xs uppercase tracking-[0.1em] text-[#71849c]">
                     {campaign.chapters.length} modulos / {stages.length} fases
                   </p>
 
                   <div className="mt-auto pt-8">
-                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="cq-progress">
                       <div
-                        className="h-full rounded-full bg-blue-400 transition-all"
+                        className="cq-progress-fill transition-all"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
 
-                    <span className="mt-5 inline-block rounded-lg bg-blue-600 px-5 py-3 font-semibold transition group-hover:bg-blue-500">
+                    <span className="cq-button mt-5">
                       Entrar
                     </span>
                   </div>
