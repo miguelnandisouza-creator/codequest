@@ -1,14 +1,10 @@
-import { readStoredUsers } from "@/infrastructure/auth/userStore";
+import { findStoredUserByCredentials } from "@/infrastructure/auth/userStore";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const users = await readStoredUsers();
-  const user = users.find((storedUser) => (
-    storedUser.email === email &&
-    storedUser.password === password
-  ));
+  const user = await findStoredUserByCredentials(email, password);
 
   if (!user) {
     return authError("Email ou senha invalidos.");
@@ -23,7 +19,7 @@ export async function POST(request: Request) {
 
   return new Response(
     `<!doctype html><meta charset="utf-8"><script>
-      const user = ${JSON.stringify(user)};
+      const user = ${JSON.stringify(toClientUser(user))};
       const session = ${JSON.stringify(session)};
       const usersKey = "codequest-users";
       const currentUsers = JSON.parse(localStorage.getItem(usersKey) || "[]");
@@ -38,6 +34,21 @@ export async function POST(request: Request) {
       },
     }
   );
+}
+
+function toClientUser(user: {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+}) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    password: "",
+    createdAt: user.createdAt,
+  };
 }
 
 function authError(message: string) {

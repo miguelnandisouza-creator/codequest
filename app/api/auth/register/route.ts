@@ -1,4 +1,4 @@
-import { readStoredUsers, writeStoredUsers } from "@/infrastructure/auth/userStore";
+import { createStoredUser } from "@/infrastructure/auth/userStore";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -19,21 +19,17 @@ export async function POST(request: Request) {
     return authError("As senhas nao conferem.");
   }
 
-  const users = await readStoredUsers();
+  let user;
 
-  if (users.some((user) => user.email === email)) {
-    return authError("Ja existe uma conta com esse email.");
+  try {
+    user = await createStoredUser({
+      name,
+      email,
+      password,
+    });
+  } catch (error) {
+    return authError(error instanceof Error ? error.message : "Nao foi possivel criar a conta.");
   }
-
-  const user = {
-    id: crypto.randomUUID(),
-    name,
-    email,
-    password,
-    createdAt: new Date().toISOString(),
-  };
-
-  await writeStoredUsers([...users, user]);
 
   return authSuccess(user);
 }
@@ -53,7 +49,6 @@ function authSuccess(user: {
   id: string;
   name: string;
   email: string;
-  password: string;
   createdAt: string;
 }) {
   const session = {
@@ -65,7 +60,13 @@ function authSuccess(user: {
 
   return new Response(
     `<!doctype html><meta charset="utf-8"><script>
-      const user = ${JSON.stringify(user)};
+      const user = ${JSON.stringify({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        password: "",
+        createdAt: user.createdAt,
+      })};
       const session = ${JSON.stringify(session)};
       const usersKey = "codequest-users";
       const currentUsers = JSON.parse(localStorage.getItem(usersKey) || "[]");

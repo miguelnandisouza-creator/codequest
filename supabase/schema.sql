@@ -10,6 +10,16 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.codequest_users (
+  id uuid primary key,
+  name text not null,
+  email text not null unique,
+  password_hash text not null,
+  password_salt text not null,
+  password_version integer not null default 1,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.player_progress (
   user_id uuid primary key,
   player jsonb not null,
@@ -61,6 +71,7 @@ values ('miguelnandisouza@gmail.com')
 on conflict (email) do nothing;
 
 alter table public.profiles enable row level security;
+alter table public.codequest_users enable row level security;
 alter table public.player_progress enable row level security;
 alter table public.player_inventory enable row level security;
 alter table public.surprise_exams enable row level security;
