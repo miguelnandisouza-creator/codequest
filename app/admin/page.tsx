@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import {
@@ -73,6 +74,7 @@ export default function AdminPage() {
     getServerLocalSessionSnapshot
   );
   const session = useMemo(() => parseJson<LocalSession>(sessionSnapshot), [sessionSnapshot]);
+  const [authReady, setAuthReady] = useState(false);
   const [rows, setRows] = useState<AdminRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -100,6 +102,10 @@ export default function AdminPage() {
 
     return rows;
   }, [filter, rows]);
+
+  useEffect(() => {
+    setAuthReady(true);
+  }, []);
 
   const loadRows = useCallback(async () => {
     if (!session) {
@@ -233,16 +239,60 @@ export default function AdminPage() {
     }
   }
 
-  if (!session || !isAdmin) {
+  if (!authReady) {
     return (
       <main className="cq-page">
         <section className="cq-shell">
           <div className="cq-panel max-w-2xl p-6">
             <p className="cq-kicker">Admin</p>
-            <h1 className="cq-title mt-3 text-4xl">Acesso negado</h1>
+            <h1 className="cq-title mt-3 text-4xl">Verificando sessao</h1>
             <p className="mt-4 text-[#93a4bd]">
-              Entre com a conta admin do Miguel para abrir este painel.
+              Conferindo se este navegador esta logado com a conta admin.
             </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!session) {
+    return (
+      <main className="cq-page">
+        <section className="cq-shell">
+          <div className="cq-panel max-w-2xl p-6">
+            <p className="cq-kicker">Admin</p>
+            <h1 className="cq-title mt-3 text-4xl">Entre para acessar</h1>
+            <p className="mt-4 text-[#93a4bd]">
+              O painel admin so abre depois do login com a conta autorizada.
+            </p>
+            <Link href="/login" className="cq-button mt-6">
+              Entrar com a conta admin
+            </Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <main className="cq-page">
+        <section className="cq-shell">
+          <div className="cq-panel max-w-2xl p-6">
+            <p className="cq-kicker">Admin</p>
+            <h1 className="cq-title mt-3 text-4xl">Conta sem permissao</h1>
+            <p className="mt-4 text-[#93a4bd]">
+              Voce esta logado como {session.email}. Para abrir este painel,
+              entre com miguelnandisouza@gmail.com.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/login" className="cq-button">
+                Trocar conta
+              </Link>
+              <Link href="/dashboard" className="cq-button cq-button-secondary">
+                Voltar ao mapa
+              </Link>
+            </div>
           </div>
         </section>
       </main>
