@@ -38,7 +38,7 @@ export async function PATCH(request: Request) {
     level?: number;
     name?: string;
     stageId?: string;
-    action?: "update" | "reset" | "resetProgress" | "resetAllProgress" | "grantReward" | "equipReward" | "toggleRewardsLock" | "assignSurpriseExam" | "clearSurpriseExam" | "restoreSnapshot" | "resetPassword";
+    action?: "update" | "reset" | "resetProgress" | "resetAllProgress" | "grantReward" | "equipReward" | "giftReward" | "toggleRewardsLock" | "assignSurpriseExam" | "clearSurpriseExam" | "restoreSnapshot" | "resetPassword";
     password?: string;
     rewardId?: string;
     snapshotId?: string;
@@ -177,7 +177,7 @@ export async function PATCH(request: Request) {
     };
   }
 
-  if ((action === "grantReward" || action === "equipReward") && body.rewardId) {
+  if ((action === "grantReward" || action === "equipReward" || action === "giftReward") && body.rewardId) {
     const reward = rewardItems.find((item) => item.id === body.rewardId);
 
     if (!reward) {
@@ -187,28 +187,29 @@ export async function PATCH(request: Request) {
     const ownedRewardIds = nextPlayer.inventory.ownedRewardIds.includes(reward.id)
       ? nextPlayer.inventory.ownedRewardIds
       : [...nextPlayer.inventory.ownedRewardIds, reward.id];
+    const shouldEquipReward = action === "equipReward" || action === "giftReward";
 
     nextPlayer = {
       ...nextPlayer,
-      avatar: reward.kind === "avatar" && action === "equipReward"
+      avatar: reward.kind === "avatar" && shouldEquipReward
         ? reward.id
         : nextPlayer.avatar,
       inventory: {
         ...nextPlayer.inventory,
         ownedRewardIds,
-        equippedAvatarId: reward.kind === "avatar" && action === "equipReward"
+        equippedAvatarId: reward.kind === "avatar" && shouldEquipReward
           ? reward.id
           : nextPlayer.inventory.equippedAvatarId,
-        equippedPetId: reward.kind === "pet" && action === "equipReward"
+        equippedPetId: reward.kind === "pet" && shouldEquipReward
           ? reward.id
           : nextPlayer.inventory.equippedPetId,
-        equippedThemeId: reward.kind === "theme" && action === "equipReward"
+        equippedThemeId: reward.kind === "theme" && shouldEquipReward
           ? reward.id
           : nextPlayer.inventory.equippedThemeId,
-        equippedFrameId: reward.kind === "frame" && action === "equipReward"
+        equippedFrameId: reward.kind === "frame" && shouldEquipReward
           ? reward.id
           : nextPlayer.inventory.equippedFrameId,
-        equippedEffectId: reward.kind === "effect" && action === "equipReward"
+        equippedEffectId: reward.kind === "effect" && shouldEquipReward
           ? reward.id
           : nextPlayer.inventory.equippedEffectId,
       },

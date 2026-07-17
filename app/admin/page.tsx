@@ -686,6 +686,14 @@ function AdminUserCard({
 
           <button
             type="button"
+            onClick={() => onUpdate(row.user.id, { action: "giftReward", rewardId })}
+            className="cq-button"
+          >
+            Presentear e equipar
+          </button>
+
+          <button
+            type="button"
             onClick={() => onUpdate(row.user.id, { action: "equipReward", rewardId })}
             className="cq-button cq-button-secondary"
           >
