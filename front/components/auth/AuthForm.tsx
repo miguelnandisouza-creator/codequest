@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 
 type Props = {
   mode: "login" | "register";
@@ -79,38 +82,20 @@ export default function AuthForm({ mode }: Props) {
           />
         </label>
 
-        <label className="block">
-          <span className="mb-2 block font-mono text-xs font-bold uppercase tracking-[0.1em] text-[#9ec0ff]">
-            Senha
-          </span>
-          <div className="flex rounded-md border border-[#26384f] bg-[#07101d] focus-within:border-[#5b8cff]">
-            <input
-              name="password"
-              className="min-w-0 flex-1 bg-transparent px-4 py-3 text-white outline-none"
-              placeholder="Minimo 6 caracteres"
-              type="password"
-              autoComplete={isRegister ? "new-password" : "current-password"}
-              required
-            />
-          </div>
-        </label>
+        <PasswordField
+          name="password"
+          label="Senha"
+          placeholder="Minimo 6 caracteres"
+          autoComplete={isRegister ? "new-password" : "current-password"}
+        />
 
         {isRegister && (
-          <label className="block">
-            <span className="mb-2 block font-mono text-xs font-bold uppercase tracking-[0.1em] text-[#9ec0ff]">
-              Confirmar senha
-            </span>
-            <div className="flex rounded-md border border-[#26384f] bg-[#07101d] focus-within:border-[#5b8cff]">
-              <input
-                name="confirmPassword"
-                className="min-w-0 flex-1 bg-transparent px-4 py-3 text-white outline-none"
-                placeholder="Repita sua senha"
-                type="password"
-                autoComplete="new-password"
-                required
-              />
-            </div>
-          </label>
+          <PasswordField
+            name="confirmPassword"
+            label="Confirmar senha"
+            placeholder="Repita sua senha"
+            autoComplete="new-password"
+          />
         )}
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -124,5 +109,66 @@ export default function AuthForm({ mode }: Props) {
         </div>
       </form>
     </div>
+  );
+}
+
+function PasswordField({
+  name,
+  label,
+  placeholder,
+  autoComplete,
+}: {
+  name: string;
+  label: string;
+  placeholder: string;
+  autoComplete: string;
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+
+  return (
+    <label className="block">
+      <span className="mb-2 block font-mono text-xs font-bold uppercase tracking-[0.1em] text-[#9ec0ff]">
+        {label}
+      </span>
+      <div className="flex rounded-md border border-[#26384f] bg-[#07101d] focus-within:border-[#5b8cff]">
+        <input
+          name={name}
+          className="min-w-0 flex-1 bg-transparent px-4 py-3 text-white outline-none"
+          placeholder={placeholder}
+          type={showPassword ? "text" : "password"}
+          autoComplete={autoComplete}
+          required
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword((current) => !current)}
+          className="grid w-12 place-items-center text-[#9ec0ff] transition hover:text-white"
+          aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+          title={showPassword ? "Ocultar senha" : "Mostrar senha"}
+        >
+          {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+        </button>
+      </div>
+    </label>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 3l18 18" />
+      <path d="M10.6 10.6A2 2 0 0 0 12 14a2 2 0 0 0 1.4-.6" />
+      <path d="M9.9 5.2A10.5 10.5 0 0 1 12 5c6.5 0 10 7 10 7a17.8 17.8 0 0 1-3 4" />
+      <path d="M6.5 6.8C3.6 8.7 2 12 2 12s3.5 7 10 7a10.8 10.8 0 0 0 4.1-.8" />
+    </svg>
   );
 }

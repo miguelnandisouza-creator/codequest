@@ -1,4 +1,5 @@
 import { findStoredUserByCredentials } from "@/infrastructure/auth/userStore";
+import { createSessionToken } from "@/infrastructure/auth/sessionToken";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -10,11 +11,20 @@ export async function POST(request: Request) {
     return authError("Email ou senha invalidos.");
   }
 
-  const session = {
+  const sessionData = {
     userId: user.id,
     email: user.email,
     name: user.name,
     startedAt: new Date().toISOString(),
+  };
+  const session = {
+    ...sessionData,
+    sessionToken: createSessionToken({
+      userId: sessionData.userId,
+      email: sessionData.email,
+      name: sessionData.name,
+      issuedAt: sessionData.startedAt,
+    }),
   };
 
   return new Response(

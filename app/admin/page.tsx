@@ -117,12 +117,18 @@ export default function AdminPage() {
 
     try {
       const response = await fetch(
-        `/api/admin/progress?adminEmail=${encodeURIComponent(session.email)}`,
-        { cache: "no-store" }
+        "/api/admin/progress",
+        {
+          cache: "no-store",
+          headers: getAdminRequestHeaders(session),
+        }
       );
       const storageResponse = await fetch(
-        `/api/admin/storage-status?adminEmail=${encodeURIComponent(session.email)}`,
-        { cache: "no-store" }
+        "/api/admin/storage-status",
+        {
+          cache: "no-store",
+          headers: getAdminRequestHeaders(session),
+        }
       );
       const data = await response.json() as { rows?: AdminRow[]; stageOptions?: StageOption[]; error?: string };
       const storageData = await storageResponse.json() as { mode?: "local" | "supabase" };
@@ -155,10 +161,11 @@ export default function AdminPage() {
     }
 
     const response = await fetch(
-      `/api/admin/progress?adminEmail=${encodeURIComponent(session.email)}`,
+      "/api/admin/progress",
       {
         method: "PATCH",
         headers: {
+          ...getAdminRequestHeaders(session),
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -191,7 +198,7 @@ export default function AdminPage() {
         }
         : row
     )));
-    setMessage("Progresso atualizado.");
+    setMessage(getAdminSuccessMessage(patch, data.user?.name));
   }
 
   async function resetAllProgress() {
@@ -208,10 +215,11 @@ export default function AdminPage() {
 
     try {
       const response = await fetch(
-        `/api/admin/progress?adminEmail=${encodeURIComponent(session.email)}`,
+        "/api/admin/progress",
         {
           method: "PATCH",
           headers: {
+            ...getAdminRequestHeaders(session),
             "content-type": "application/json",
           },
           body: JSON.stringify({
@@ -293,6 +301,25 @@ export default function AdminPage() {
                 Voltar ao mapa
               </Link>
             </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!session.sessionToken) {
+    return (
+      <main className="cq-page">
+        <section className="cq-shell">
+          <div className="cq-panel max-w-2xl p-6">
+            <p className="cq-kicker">Admin</p>
+            <h1 className="cq-title mt-3 text-4xl">Sessao antiga</h1>
+            <p className="mt-4 text-[#93a4bd]">
+              Entre de novo com a conta admin para ativar a protecao nova do painel.
+            </p>
+            <Link href="/login" className="cq-button mt-6">
+              Entrar de novo
+            </Link>
           </div>
         </section>
       </main>
@@ -937,4 +964,46 @@ function parseJson<T>(value: string) {
   } catch {
     return null;
   }
+}
+
+function getAdminRequestHeaders(session: LocalSession): Record<string, string> {
+  if (!session.sessionToken) {
+    return {};
+  }
+
+  return { "x-codequest-session-token": session.sessionToken };
+}
+
+function getAdminSuccessMessage(patch: AdminProgressPatch, userName?: string) {
+  const target = userName ? `${userName} ` : "";
+
+  if (patch.action === "giftReward" && patch.rewardId) {
+    const reward = rewardItems.find((item) => item.id === patch.rewardId);
+
+    return reward
+      ? `${target}recebeu ${reward.name} e ja equipou.`
+      : "Presente entregue e equipado.";
+  }
+
+  if (patch.action === "grantReward" && patch.rewardId) {
+    const reward = rewardItems.find((item) => item.id === patch.rewardId);
+
+    return reward
+      ? `${target}recebeu ${reward.name}.`
+      : "Recompensa liberada.";
+  }
+
+  if (patch.action === "equipReward" && patch.rewardId) {
+    const reward = rewardItems.find((item) => item.id === patch.rewardId);
+
+    return reward
+      ? `${target}equipou ${reward.name}.`
+      : "Recompensa equipada.";
+  }
+
+  if (patch.action === "resetPassword") {
+    return `Senha de ${userName ?? "usuario"} redefinida.`;
+  }
+
+  return "Progresso atualizado.";
 }

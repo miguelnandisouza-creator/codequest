@@ -11,6 +11,7 @@ export type LocalSession = {
   email: string;
   name: string;
   startedAt: string;
+  sessionToken?: string;
 };
 
 const usersKey = "codequest-users";

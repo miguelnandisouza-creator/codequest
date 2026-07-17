@@ -1,7 +1,7 @@
-import { isAdminEmail } from "@/data/admin";
 import { rewardItems } from "@/data/rewards";
 import { campaigns } from "@/data/campaigns";
 import { readStoredUsers, resetStoredUserPassword, updateStoredUserName } from "@/infrastructure/auth/userStore";
+import { isAdminSessionRequest } from "@/infrastructure/auth/sessionToken";
 import { readRecentAttempts } from "@/infrastructure/supabase/attemptRepository";
 import {
   readProgressSnapshots,
@@ -12,7 +12,7 @@ import {
 import { initialPlayer } from "@/domain/game/playerProgress";
 
 export async function GET(request: Request) {
-  if (!isAdminRequest(request)) {
+  if (!isAdminSessionRequest(request)) {
     return Response.json({ error: "Acesso negado." }, { status: 403 });
   }
 
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!isAdminRequest(request)) {
+  if (!isAdminSessionRequest(request)) {
     return Response.json({ error: "Acesso negado." }, { status: 403 });
   }
 
@@ -279,12 +279,6 @@ export async function PATCH(request: Request) {
     attempts: await readRecentAttempts(body.userId, 8),
     snapshots: await readProgressSnapshots(body.userId, 8),
   });
-}
-
-function isAdminRequest(request: Request) {
-  const email = new URL(request.url).searchParams.get("adminEmail") ?? "";
-
-  return isAdminEmail(email);
 }
 
 function getStageOptions() {
