@@ -155,4 +155,72 @@ describe("validateAnswer", () => {
       ).message
     ).toContain("ponto e virgula");
   });
+
+  it("accepts optional trailing semicolons for expression challenges", () => {
+    expect(
+      validateAnswer(
+        "17 % 4;",
+        "17 % 4"
+      ).success
+    ).toBe(true);
+  });
+
+  it("accepts JavaScript quote variations when the string value is the same", () => {
+    expect(
+      validateAnswer(
+        "let cidade = 'Curitiba';",
+        "let cidade = \"Curitiba\";"
+      ).success
+    ).toBe(true);
+  });
+
+  it("accepts Python quote variations when the string value is the same", () => {
+    expect(
+      validateAnswer(
+        "cidade = 'Recife'\nprint(cidade)",
+        "cidade = \"Recife\"\nprint(cidade)"
+      ).success
+    ).toBe(true);
+  });
+
+  it("accepts independent declaration order before later use", () => {
+    expect(
+      validateAnswer(
+        "const cidade = \"Curitiba\";\nconst idade = 25;\nconst nome = \"Ana\";\n`Meu nome e ${nome}, tenho ${idade} anos e moro em ${cidade}`",
+        "const nome = \"Ana\";\nconst idade = 25;\nconst cidade = \"Curitiba\";\n`Meu nome e ${nome}, tenho ${idade} anos e moro em ${cidade}`"
+      ).success
+    ).toBe(true);
+  });
+
+  it("keeps rejecting code that misses required behavior", () => {
+    expect(
+      validateAnswer(
+        "const nome = \"Ana\";",
+        "const nome = \"Ana\";\nconst idade = 25;"
+      ).success
+    ).toBe(false);
+
+    expect(
+      validateAnswer(
+        "if (nota >= 7) { console.log(\"Aprovado\"); }",
+        "if (nota >= 7) { console.log(\"Aprovado\"); } else { console.log(\"Reprovado\"); }"
+      ).success
+    ).toBe(false);
+  });
+
+  it("gives language-aware output feedback", () => {
+    expect(
+      validateAnswer(
+        "nome",
+        "console.log(nome);"
+      ).message
+    ).toContain("console.log");
+
+    expect(
+      validateAnswer(
+        "nome",
+        "Console.WriteLine(nome);"
+      ).message
+    ).toContain("Console.WriteLine");
+  });
 });

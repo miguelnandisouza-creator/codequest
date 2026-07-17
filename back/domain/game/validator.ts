@@ -7,10 +7,7 @@ export function validateAnswer(
   code: string,
   expectedAnswer: string
 ): ValidationResult {
-  const normalizedCode = normalizeAnswer(code);
-  const normalizedExpected = normalizeAnswer(expectedAnswer);
-
-  if (normalizedCode === normalizedExpected) {
+  if (answersMatch(code, expectedAnswer)) {
     return {
       success: true,
       message: "Resposta correta!",
@@ -23,6 +20,23 @@ export function validateAnswer(
     success: false,
     message: feedback,
   };
+}
+
+function answersMatch(code: string, expectedAnswer: string) {
+  const normalizedCode = normalizeAnswer(code);
+  const normalizedExpected = normalizeAnswer(expectedAnswer);
+
+  if (normalizedCode === normalizedExpected) {
+    return true;
+  }
+
+  if (normalizeSqlText(expectedAnswer).startsWith("select ")) {
+    return false;
+  }
+
+  return getCodeVariants(code, expectedAnswer).some((codeVariant) => (
+    getCodeVariants(expectedAnswer, expectedAnswer).includes(codeVariant)
+  ));
 }
 
 function buildFeedback(code: string, expectedAnswer: string) {
@@ -141,10 +155,11 @@ function buildCodeFeedback(code: string, expectedAnswer: string) {
 
   if (
     /(?:^|[^=!<>])=([^=]|$)/.test(trimmedCode) &&
-    expectedTokens.includes("==") &&
-    !codeTokens.includes("==")
+    (expectedTokens.includes("==") || expectedTokens.includes("===")) &&
+    !codeTokens.includes("==") &&
+    !codeTokens.includes("===")
   ) {
-    return "Parece que voce atribuiu com = onde precisava comparar. Em Java, comparacao usa ==.";
+    return "Parece que voce atribuiu com = onde precisava comparar. Em comparacao usa == ou === conforme a linguagem.";
   }
 
   if (
@@ -155,12 +170,36 @@ function buildCodeFeedback(code: string, expectedAnswer: string) {
     return "Para comparar conteudo de String, use equals em vez de ==.";
   }
 
-  if (expectedTokens.includes(";") && !codeTokens.includes(";")) {
-    return "Faltou ponto e virgula em alguma instrucao simples.";
-  }
-
   if (expectedTokens.includes("system") && !codeTokens.includes("system")) {
     return "Essa missao espera uma saida no terminal. Use System.out.print ou System.out.println.";
+  }
+
+  if (
+    expectedTokens.includes("console") &&
+    expectedTokens.includes("writeline") &&
+    (!codeTokens.includes("console") || !codeTokens.includes("writeline"))
+  ) {
+    return "Essa missao espera uma saida no terminal. Use Console.WriteLine com o valor pedido.";
+  }
+
+  if (expectedTokens.includes("console") && !codeTokens.includes("console")) {
+    return "Essa missao espera uma saida no console. Use console.log com o valor pedido.";
+  }
+
+  if (expectedTokens.includes("print") && !codeTokens.includes("print")) {
+    return "Essa missao espera uma saida no terminal. Use print com o valor pedido.";
+  }
+
+  if (expectedTokens.includes("=>") && !codeTokens.includes("=>")) {
+    return "Essa missao espera uma arrow function. Use => para declarar o callback ou funcao curta.";
+  }
+
+  if (expectedTokens.includes("await") && !codeTokens.includes("await")) {
+    return "Essa missao precisa esperar uma Promise ou tarefa assincrona. Use await no ponto indicado.";
+  }
+
+  if (expectedTokens.includes(";") && !codeTokens.includes(";")) {
+    return "Faltou ponto e virgula em alguma instrucao simples.";
   }
 
   if (expectedTokens.includes("if") && !codeTokens.includes("if")) {
@@ -237,18 +276,179 @@ function normalizeAnswer(text: string) {
 }
 
 function normalizeCodeText(text: string) {
-  return tokenizeCode(
-    text
-      .trim()
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*$/gm, "")
-      .replace(/\s*;\s*$/g, ";")
-  ).join("|");
+  return tokenizeCode(stripCodeComments(text).trim().replace(/\s*;\s*$/g, ";")).join("|");
+}
+
+function getCodeVariants(text: string, expectedAnswer: string) {
+  const stripped = stripCodeComments(text).trim();
+  const variants = new Set<string>([
+    normalizeCodeText(stripped),
+  ]);
+
+  if (!tokenizeCode(expectedAnswer).includes(";")) {
+    variants.add(tokenizeCode(stripped.replace(/\s*;\s*$/g, "")).join("|"));
+  }
+
+  variants.add(normalizeStringQuoteTokens(stripped, expectedAnswer).join("|"));
+
+  const reordered = normalizeIndependentDeclarations(stripped, expectedAnswer);
+
+  if (reordered) {
+    variants.add(reordered);
+    variants.add(normalizeStringQuoteTokens(reordered.replace(/\|/g, " "), expectedAnswer).join("|"));
+  }
+
+  return [...variants];
+}
+
+function stripCodeComments(text: string) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "")
+    .replace(/#.*$/gm, "");
+}
+
+function normalizeStringQuoteTokens(text: string, expectedAnswer: string) {
+  const shouldNormalizeQuotes = isLikelyJavaScript(expectedAnswer) || isLikelyPython(expectedAnswer);
+
+  return tokenizeCode(text).map((token) => {
+    if (!shouldNormalizeQuotes || !isStringLiteral(token)) {
+      return token;
+    }
+
+    return `string:${token.slice(1, -1)}`;
+  });
+}
+
+function isLikelyJavaScript(text: string) {
+  const tokens = tokenizeCode(text);
+
+  return tokens.some((token) => [
+    "const",
+    "let",
+    "document",
+    "console",
+    "function",
+    "async",
+    "await",
+    "=>",
+  ].includes(token));
+}
+
+function isLikelyPython(text: string) {
+  const tokens = tokenizeCode(text);
+
+  return tokens.some((token) => [
+    "def",
+    "print",
+    "input",
+    "elif",
+    "none",
+    "true",
+    "false",
+    "self",
+  ].includes(token)) || /^\s*(for|while|if|try|except|with)\b/m.test(text);
+}
+
+function isStringLiteral(token: string) {
+  return (
+    (token.startsWith("\"") && token.endsWith("\"")) ||
+    (token.startsWith("'") && token.endsWith("'"))
+  );
+}
+
+function normalizeIndependentDeclarations(text: string, expectedAnswer: string) {
+  const expectedTokens = tokenizeCode(expectedAnswer);
+  const declarationKeywords = getDeclarationKeywords(expectedTokens);
+
+  if (declarationKeywords.length === 0) {
+    return "";
+  }
+
+  const statements = splitCodeStatements(text);
+  const normalizedStatements = statements.map((statement) => tokenizeCode(statement).join("|"));
+  const declarationIndexes = normalizedStatements
+    .map((statement, index) => ({ statement, index }))
+    .filter(({ statement }) => declarationKeywords.some((keyword) => (
+      statement.startsWith(`${keyword}|`)
+    )));
+
+  if (declarationIndexes.length < 2) {
+    return "";
+  }
+
+  const declarationIndexSet = new Set(declarationIndexes.map(({ index }) => index));
+  const sortedDeclarations = declarationIndexes
+    .map(({ statement }) => statement)
+    .sort();
+  let nextDeclarationIndex = 0;
+
+  return normalizedStatements.map((statement, index) => {
+    if (!declarationIndexSet.has(index)) {
+      return statement;
+    }
+
+    return sortedDeclarations[nextDeclarationIndex++];
+  }).join("|;|");
+}
+
+function getDeclarationKeywords(tokens: string[]) {
+  return [
+    "const",
+    "let",
+    "var",
+    "int",
+    "double",
+    "decimal",
+    "string",
+    "boolean",
+    "bool",
+  ].filter((keyword) => tokens.includes(keyword));
+}
+
+function splitCodeStatements(text: string) {
+  const statements: string[] = [];
+  let current = "";
+  let depth = 0;
+  let quote = "";
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const previous = text[index - 1];
+
+    current += char;
+
+    if (quote) {
+      if (char === quote && previous !== "\\") {
+        quote = "";
+      }
+      continue;
+    }
+
+    if (char === "\"" || char === "'" || char === "`") {
+      quote = char;
+      continue;
+    }
+
+    if (char === "{" || char === "(" || char === "[") depth += 1;
+    if (char === "}" || char === ")" || char === "]") depth -= 1;
+
+    if (char === ";" && depth === 0) {
+      statements.push(current.trim());
+      current = "";
+    }
+  }
+
+  if (current.trim()) {
+    statements.push(current.trim());
+  }
+
+  return statements;
 }
 
 function tokenizeCode(text: string) {
   const tokens = text.match(
-    /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|==|!=|<=|>=|\+\+|--|&&|\|\||[{}()[\];,.:+\-*/%=<>]/g
+    /`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_$][\w$]*|\d+(?:\.\d+)?m?|=>|==|!=|<=|>=|\+\+|--|\+=|-=|&&|\|\||[{}()[\];,.:+\-*/%=<>]/g
   ) ?? [];
 
   return tokens.map((token) => {

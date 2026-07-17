@@ -109,6 +109,20 @@ export const pythonCampaign = createCampaign({
           ],
         }),
         stage({
+          id: "py-clearing-04b-input-conversion",
+          order: 4.5,
+          title: "Convertendo entradas com seguranca",
+          description: "Entenda por que input() sempre retorna texto.",
+          type: "challenge",
+          xp: 70,
+          coins: 35,
+          content: [
+            intro("Texto que parece numero", "input() sempre devolve uma str. Para somar como numero, converta com int() ou float(). Se esquecer, Python junta textos ou gera erro em contas."),
+            example("Idade convertida", "A conversao acontece antes da soma.", "idade_texto = input(\"Idade: \")\nidade = int(idade_texto)\nprint(idade + 1)", "idade somada como numero"),
+            challenge("Preco convertido", "Leia preco_texto com input e crie preco usando float(preco_texto).", "preco_texto = input(\"Preco: \")\npreco = float(preco_texto)", "Use float para valores decimais."),
+          ],
+        }),
+        stage({
           id: "py-clearing-05-fstrings",
           order: 5,
           title: "f-strings",
@@ -158,8 +172,10 @@ export const pythonCampaign = createCampaign({
       stages: [
         stage({ id: "py-depot-01-lists", order: 1, title: "Listas", description: "Guarde varios valores em ordem.", type: "challenge", xp: 75, coins: 35, content: [intro("Caixas numeradas", "Listas guardam itens em ordem e podem crescer com append()."), example("Frutas", "frutas[0] acessa o primeiro item.", "frutas = [\"maca\", \"banana\", \"uva\"]\nprint(frutas[0])\nfrutas.append(\"laranja\")", "maca"), challenge("Lista de numeros", "Crie numeros com 1, 2, 3 e use append para adicionar 4.", "numeros = [1, 2, 3]\nnumeros.append(4)", "Use colchetes e .append(4).")]}),
         stage({ id: "py-depot-02-list-loop", order: 2, title: "Percorrendo listas", description: "Use for para visitar cada item.", type: "challenge", xp: 75, coins: 35, content: [intro("Prateleira por prateleira", "for item in lista executa o bloco para cada item da lista."), example("Frutas uma a uma", "A variavel fruta recebe cada item.", "for fruta in frutas:\n    print(fruta)", "cada fruta impressa"), challenge("Nomes um a um", "Use for para imprimir cada item de uma lista nomes.", "for nome in nomes:\n    print(nome)", "Use for nome in nomes.")]}),
+        stage({ id: "py-depot-02b-slicing", order: 2.5, title: "Fatiando listas e textos", description: "Use indices para pegar pedacos.", type: "challenge", xp: 80, coins: 40, content: [intro("Cortes precisos", "Slicing usa inicio:fim para pegar parte de uma lista ou texto. O inicio entra, o fim fica de fora. lista[0:3] pega os tres primeiros itens."), example("Primeiros nomes", "O resultado e uma nova lista com parte dos itens.", "nomes = [\"Ana\", \"Biel\", \"Carla\", \"Duda\"]\nprimeiros = nomes[0:2]", "[\"Ana\", \"Biel\"]"), challenge("Tres primeiros", "Crie primeiros com os tres primeiros itens da lista numeros.", "primeiros = numeros[0:3]", "Use numeros[0:3].")]}),
         stage({ id: "py-depot-03-comprehension", order: 3, title: "List comprehension", description: "Crie listas novas de forma compacta.", type: "quiz", xp: 65, coins: 30, content: [intro("Filtro em uma linha", "List comprehension cria uma nova lista aplicando uma expressao e, opcionalmente, um filtro."), example("Somente pares", "O if filtra valores pares.", "numeros = [1, 2, 3, 4, 5]\npares = [n for n in numeros if n % 2 == 0]", "[2, 4]"), quiz("Pergunta do filtro", "O que a comprehension do exemplo retorna?", ["Uma lista so com numeros pares", "Uma lista vazia sempre", "Um dicionario"], "Uma lista so com numeros pares", "O filtro n % 2 == 0 deixa apenas pares.")]}),
         stage({ id: "py-depot-04-dicts", order: 4, title: "Dicionarios", description: "Organize dados em chave e valor.", type: "challenge", xp: 80, coins: 40, content: [intro("Etiquetas nos valores", "Dicionarios guardam pares chave-valor, bons para representar coisas com propriedades."), example("Pessoa", "pessoa['nome'] pega o valor da chave nome.", "pessoa = {\"nome\": \"Ana\", \"idade\": 25}\nprint(pessoa[\"nome\"])", "Ana"), challenge("Produto", "Crie um dicionario produto com chaves nome e preco.", "produto = {\"nome\": \"Caneta\", \"preco\": 2.5}", "Use chaves e pares \"nome\": valor.")]}),
+        stage({ id: "py-depot-04b-sets", order: 4.5, title: "Sets removem repetidos", description: "Guarde valores unicos.", type: "challenge", xp: 80, coins: 40, content: [intro("Lista sem duplicatas", "set guarda valores unicos. Ele e util para remover repetidos e testar pertencimento com in."), example("Cidades unicas", "Sao Paulo aparece uma vez no set.", "cidades = [\"Recife\", \"Sao Paulo\", \"Recife\"]\nunicas = set(cidades)", "{\"Recife\", \"Sao Paulo\"}"), challenge("Tags unicas", "Crie unicas convertendo a lista tags para set.", "unicas = set(tags)", "Use set(tags).")]}),
         stage({ id: "py-depot-05-functions", order: 5, title: "Funcoes", description: "Crie blocos reutilizaveis com def.", type: "challenge", xp: 85, coins: 45, content: [intro("Ferramentas com nome", "Funcoes recebem valores, executam uma tarefa e podem retornar resultado."), example("Somar", "return devolve o resultado para quem chamou.", "def somar(a, b):\n    return a + b\n\nprint(somar(2, 3))", "5"), challenge("Dobro", "Crie uma funcao dobro(numero) que retorne numero vezes 2.", "def dobro(numero):\n    return numero * 2", "Use def e return numero * 2.")]}),
         stage({ id: "py-depot-06-boss", order: 6, title: "Chefe: O Guardiao do Deposito", description: "Filtre uma lista de dicionarios usando funcao.", type: "boss", xp: 150, coins: 75, content: [intro("Relatorio do deposito", "Agora voce mistura estruturas: uma lista de produtos, cada produto como dicionario, e uma funcao para filtrar."), boss("Produtos caros", "Crie uma funcao caros(produtos) que retorna apenas produtos com preco acima de 100.", "def caros(produtos):\n    return [produto for produto in produtos if produto[\"preco\"] > 100]", "Use list comprehension filtrando produto['preco'] > 100.")]}),
       ],
