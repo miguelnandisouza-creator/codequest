@@ -6,16 +6,18 @@ type Props = {
   code: string;
   setCode: (value: string) => void;
   language?: string;
+  height?: string;
 };
 
 export function CodeEditor({
   code,
   setCode,
   language = "sql",
+  height = "400px",
 }: Props) {
   return (
     <Editor
-      height="400px"
+      height={height}
       defaultLanguage={language}
       language={language}
       theme="vs-dark"

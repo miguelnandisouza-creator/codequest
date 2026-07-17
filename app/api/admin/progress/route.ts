@@ -1,8 +1,12 @@
 import { isAdminEmail } from "@/data/admin";
 import { rewardItems } from "@/data/rewards";
-import { readStoredUsers } from "@/infrastructure/auth/userStore";
+import { campaigns } from "@/data/campaigns";
+import { readStoredUsers, resetStoredUserPassword, updateStoredUserName } from "@/infrastructure/auth/userStore";
+import { readRecentAttempts } from "@/infrastructure/supabase/attemptRepository";
 import {
+  readProgressSnapshots,
   readPlayerProgress,
+  restoreProgressSnapshot,
   writePlayerProgress,
 } from "@/infrastructure/supabase/playerProgressRepository";
 import { initialPlayer } from "@/domain/game/playerProgress";
@@ -16,9 +20,11 @@ export async function GET(request: Request) {
   const rows = await Promise.all(users.map(async (user) => ({
     user,
     player: await readPlayerProgress(user.id),
+    attempts: await readRecentAttempts(user.id, 8),
+    snapshots: await readProgressSnapshots(user.id, 8),
   })));
 
-  return Response.json({ rows });
+  return Response.json({ rows, stageOptions: getStageOptions() });
 }
 
 export async function PATCH(request: Request) {
@@ -30,8 +36,12 @@ export async function PATCH(request: Request) {
     userId?: string;
     coins?: number;
     level?: number;
-    action?: "update" | "reset" | "grantReward" | "equipReward" | "assignSurpriseExam" | "clearSurpriseExam";
+    name?: string;
+    stageId?: string;
+    action?: "update" | "reset" | "resetProgress" | "resetAllProgress" | "grantReward" | "equipReward" | "toggleRewardsLock" | "assignSurpriseExam" | "clearSurpriseExam" | "restoreSnapshot" | "resetPassword";
+    password?: string;
     rewardId?: string;
+    snapshotId?: string;
     surpriseExam?: {
       title?: string;
       question?: string;
@@ -42,13 +52,85 @@ export async function PATCH(request: Request) {
     };
   } | null;
 
+  if (body?.action === "resetAllProgress") {
+    const users = await readStoredUsers();
+
+    await Promise.all(users.map(async (user) => {
+      const currentPlayer = await readPlayerProgress(user.id);
+
+      await writePlayerProgress(
+        user.id,
+        {
+          ...currentPlayer,
+          xp: initialPlayer.xp,
+          level: initialPlayer.level,
+          coins: initialPlayer.coins,
+          streak: initialPlayer.streak,
+          achievements: [],
+          progress: {
+            ...initialPlayer.progress,
+            completedStages: [],
+          },
+          updatedAt: new Date().toISOString(),
+        },
+        { forceOverwrite: true }
+      );
+    }));
+
+    const rows = await Promise.all(users.map(async (user) => ({
+      user,
+      player: await readPlayerProgress(user.id),
+      attempts: await readRecentAttempts(user.id, 8),
+      snapshots: await readProgressSnapshots(user.id, 8),
+    })));
+
+    return Response.json({ rows, stageOptions: getStageOptions() });
+  }
+
   if (!body?.userId) {
     return Response.json({ error: "Usuario nao informado." }, { status: 400 });
   }
 
   const player = await readPlayerProgress(body.userId);
   const action = body.action ?? "update";
-  const forceOverwrite = action === "reset";
+
+  if (body.name !== undefined) {
+    await updateStoredUserName(body.userId, body.name);
+  }
+
+  if (action === "resetPassword") {
+    if (!body.password) {
+      return Response.json({ error: "Senha nao informada." }, { status: 400 });
+    }
+
+    await resetStoredUserPassword(body.userId, body.password);
+    const user = (await readStoredUsers()).find((storedUser) => storedUser.id === body.userId);
+
+    return Response.json({
+      player,
+      user,
+      attempts: await readRecentAttempts(body.userId, 8),
+      snapshots: await readProgressSnapshots(body.userId, 8),
+    });
+  }
+
+  if (action === "restoreSnapshot") {
+    if (!body.snapshotId) {
+      return Response.json({ error: "Snapshot nao informado." }, { status: 400 });
+    }
+
+    const restoredPlayer = await restoreProgressSnapshot(body.userId, body.snapshotId);
+    const user = (await readStoredUsers()).find((storedUser) => storedUser.id === body.userId);
+
+    return Response.json({
+      player: restoredPlayer,
+      user,
+      attempts: await readRecentAttempts(body.userId, 8),
+      snapshots: await readProgressSnapshots(body.userId, 8),
+    });
+  }
+
+  const forceOverwrite = action === "reset" || action === "resetProgress";
   let nextPlayer = {
     ...player,
     coins: Number.isFinite(body.coins) ? Math.max(0, Math.floor(Number(body.coins))) : player.coins,
@@ -59,6 +141,39 @@ export async function PATCH(request: Request) {
     nextPlayer = {
       ...initialPlayer,
       id: body.userId,
+    };
+  }
+
+  if (action === "resetProgress") {
+    nextPlayer = {
+      ...player,
+      xp: initialPlayer.xp,
+      level: initialPlayer.level,
+      coins: initialPlayer.coins,
+      streak: initialPlayer.streak,
+      achievements: [],
+      progress: {
+        ...initialPlayer.progress,
+        completedStages: [],
+      },
+    };
+  }
+
+  if (body.stageId) {
+    const stageOption = getStageOptions().find((stage) => stage.id === body.stageId);
+
+    if (!stageOption) {
+      return Response.json({ error: "Fase nao encontrada." }, { status: 404 });
+    }
+
+    nextPlayer = {
+      ...nextPlayer,
+      progress: {
+        ...nextPlayer.progress,
+        campaignId: stageOption.campaignId,
+        chapterId: stageOption.chapterId,
+        stageId: stageOption.id,
+      },
     };
   }
 
@@ -96,6 +211,16 @@ export async function PATCH(request: Request) {
         equippedEffectId: reward.kind === "effect" && action === "equipReward"
           ? reward.id
           : nextPlayer.inventory.equippedEffectId,
+      },
+    };
+  }
+
+  if (action === "toggleRewardsLock") {
+    nextPlayer = {
+      ...nextPlayer,
+      inventory: {
+        ...nextPlayer.inventory,
+        rewardsLocked: !nextPlayer.inventory.rewardsLocked,
       },
     };
   }
@@ -145,11 +270,33 @@ export async function PATCH(request: Request) {
     { forceOverwrite }
   );
 
-  return Response.json({ player: savedPlayer });
+  const user = (await readStoredUsers()).find((storedUser) => storedUser.id === body.userId);
+
+  return Response.json({
+    player: savedPlayer,
+    user,
+    attempts: await readRecentAttempts(body.userId, 8),
+    snapshots: await readProgressSnapshots(body.userId, 8),
+  });
 }
 
 function isAdminRequest(request: Request) {
   const email = new URL(request.url).searchParams.get("adminEmail") ?? "";
 
   return isAdminEmail(email);
+}
+
+function getStageOptions() {
+  return campaigns.flatMap((campaign) => (
+    campaign.chapters.flatMap((chapter) => (
+      chapter.stages.map((stage) => ({
+        id: stage.id,
+        title: stage.title,
+        chapterId: chapter.id,
+        chapterTitle: chapter.title,
+        campaignId: campaign.id,
+        campaignTitle: campaign.title,
+      }))
+    ))
+  ));
 }

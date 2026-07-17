@@ -30,7 +30,7 @@ function buildFeedback(code: string, expectedAnswer: string) {
   const normalizedExpected = normalizeSqlText(expectedAnswer);
 
   if (!normalizedExpected.startsWith("select ")) {
-    return "Ainda nao esta correto. Confira a sintaxe esperada.";
+    return buildCodeFeedback(code, expectedAnswer);
   }
 
   if (!normalizedCode.startsWith("select")) {
@@ -121,14 +121,143 @@ function buildFeedback(code: string, expectedAnswer: string) {
   return "A consulta esta quase certa, mas alguma parte ainda nao bate com o objetivo da missao.";
 }
 
+function buildCodeFeedback(code: string, expectedAnswer: string) {
+  const trimmedCode = code.trim();
+  const trimmedExpected = expectedAnswer.trim();
+  const codeTokens = tokenizeCode(trimmedCode);
+  const expectedTokens = tokenizeCode(trimmedExpected);
+
+  if (!trimmedCode) {
+    return "Escreva sua tentativa antes de executar. Comece pela estrutura pedida no objetivo.";
+  }
+
+  if (hasUnbalanced(trimmedCode, "{", "}")) {
+    return "Tem chave abrindo ou fechando fora de par. Confira os blocos com { }.";
+  }
+
+  if (hasUnbalanced(trimmedCode, "(", ")")) {
+    return "Tem parenteses abrindo ou fechando fora de par. Confira condicoes e chamadas de metodo.";
+  }
+
+  if (
+    /(?:^|[^=!<>])=([^=]|$)/.test(trimmedCode) &&
+    expectedTokens.includes("==") &&
+    !codeTokens.includes("==")
+  ) {
+    return "Parece que voce atribuiu com = onde precisava comparar. Em Java, comparacao usa ==.";
+  }
+
+  if (
+    expectedTokens.includes("equals") &&
+    !codeTokens.includes("equals") &&
+    trimmedCode.includes("==")
+  ) {
+    return "Para comparar conteudo de String, use equals em vez de ==.";
+  }
+
+  if (expectedTokens.includes(";") && !codeTokens.includes(";")) {
+    return "Faltou ponto e virgula em alguma instrucao simples.";
+  }
+
+  if (expectedTokens.includes("system") && !codeTokens.includes("system")) {
+    return "Essa missao espera uma saida no terminal. Use System.out.print ou System.out.println.";
+  }
+
+  if (expectedTokens.includes("if") && !codeTokens.includes("if")) {
+    return "Essa missao precisa de uma decisao. Monte um if com condicao e bloco.";
+  }
+
+  if (expectedTokens.includes("else") && !codeTokens.includes("else")) {
+    return "Faltou tratar o caminho alternativo com else.";
+  }
+
+  if (expectedTokens.includes("for") && !codeTokens.includes("for")) {
+    return "Essa missao precisa de repeticao com for. Confira inicio, condicao e incremento.";
+  }
+
+  if (expectedTokens.includes("while") && !codeTokens.includes("while")) {
+    return "Essa missao precisa de while. Lembre de mudar a variavel dentro do bloco para evitar loop infinito.";
+  }
+
+  if (expectedTokens.includes("return") && !codeTokens.includes("return")) {
+    return "O metodo precisa devolver um valor com return.";
+  }
+
+  if (expectedTokens.includes("class") && !codeTokens.includes("class")) {
+    return "Essa resposta espera uma classe. Comece declarando class e coloque atributos/metodos dentro das chaves.";
+  }
+
+  const missingKeyword = expectedTokens.find((token) => (
+    isTeachingKeyword(token) && !codeTokens.includes(token)
+  ));
+
+  if (missingKeyword) {
+    return `Faltou usar ${missingKeyword}. Revise qual conceito a missao esta treinando.`;
+  }
+
+  return "Ainda nao esta correto. Revise nomes, tipos, operadores e a ordem das instrucoes pedidas.";
+}
+
+function hasUnbalanced(text: string, open: string, close: string) {
+  let depth = 0;
+
+  for (const char of text) {
+    if (char === open) depth += 1;
+    if (char === close) depth -= 1;
+    if (depth < 0) return true;
+  }
+
+  return depth !== 0;
+}
+
+function isTeachingKeyword(token: string) {
+  return [
+    "int",
+    "double",
+    "string",
+    "boolean",
+    "arraylist",
+    "private",
+    "public",
+    "extends",
+    "implements",
+    "try",
+    "catch",
+  ].includes(token);
+}
+
 function normalizeAnswer(text: string) {
   const normalized = normalizeSqlText(text);
 
   if (!normalized.startsWith("select ")) {
-    return normalized;
+    return normalizeCodeText(text);
   }
 
   return normalizeSelectQuery(normalized);
+}
+
+function normalizeCodeText(text: string) {
+  return tokenizeCode(
+    text
+      .trim()
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "")
+      .replace(/\s*;\s*$/g, ";")
+  ).join("|");
+}
+
+function tokenizeCode(text: string) {
+  const tokens = text.match(
+    /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|==|!=|<=|>=|\+\+|--|&&|\|\||[{}()[\];,.:+\-*/%=<>]/g
+  ) ?? [];
+
+  return tokens.map((token) => {
+    if (token.startsWith("\"") || token.startsWith("'")) {
+      return token;
+    }
+
+    return token.toLowerCase();
+  });
 }
 
 function normalizeSqlText(text: string) {

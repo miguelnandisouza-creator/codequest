@@ -116,4 +116,43 @@ describe("validateAnswer", () => {
     ).toContain("ORDER BY");
 
   });
+
+  it("accepts equivalent Java formatting without requiring exact spaces", () => {
+    expect(
+      validateAnswer(
+        "if (nota >= 7) {\n  System.out.println(\"Aprovado\");\n} else {\n  System.out.println(\"Reprovado\");\n}",
+        "if (nota >= 7) { System.out.println(\"Aprovado\"); } else { System.out.println(\"Reprovado\"); }"
+      ).success
+    ).toBe(true);
+
+    expect(
+      validateAnswer(
+        "String nome=\"Ana\";\nint nivel=5;\nSystem.out.println(nome + \" chegou ao nivel \" + nivel);",
+        "String nome = \"Ana\"; int nivel = 5; System.out.println(nome + \" chegou ao nivel \" + nivel);"
+      ).success
+    ).toBe(true);
+  });
+
+  it("gives useful Java feedback without giving the answer away", () => {
+    expect(
+      validateAnswer(
+        "if (nota = 7) { System.out.println(\"Aprovado\"); }",
+        "if (nota == 7) { System.out.println(\"Aprovado\"); }"
+      ).message
+    ).toContain("comparacao usa ==");
+
+    expect(
+      validateAnswer(
+        "if (nome == \"Ana\") { System.out.println(\"Ok\"); }",
+        "if (nome.equals(\"Ana\")) { System.out.println(\"Ok\"); }"
+      ).message
+    ).toContain("String");
+
+    expect(
+      validateAnswer(
+        "int idade = 18",
+        "int idade = 18;"
+      ).message
+    ).toContain("ponto e virgula");
+  });
 });

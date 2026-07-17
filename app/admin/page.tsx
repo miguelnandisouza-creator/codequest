@@ -16,13 +16,19 @@ import { Player } from "@/domain/entities/player";
 type AdminRow = {
   user: LocalUser;
   player: Player;
+  attempts: AttemptSummary[];
+  snapshots: ProgressSnapshotSummary[];
 };
 
 type AdminProgressPatch = {
   coins?: number;
   level?: number;
+  name?: string;
+  stageId?: string;
   action?: string;
+  password?: string;
   rewardId?: string;
+  snapshotId?: string;
   surpriseExam?: {
     title: string;
     question: string;
@@ -31,6 +37,33 @@ type AdminProgressPatch = {
     rewardXp: number;
     rewardCoins: number;
   };
+};
+
+type AttemptSummary = {
+  id?: string;
+  userId: string;
+  stageId: string;
+  stepTitle?: string;
+  answer: string;
+  success: boolean;
+  feedback: string;
+  createdAt?: string;
+};
+
+type ProgressSnapshotSummary = {
+  id: string;
+  reason: string;
+  createdAt: string;
+  player: Player;
+};
+
+type StageOption = {
+  id: string;
+  title: string;
+  chapterId: string;
+  chapterTitle: string;
+  campaignId: string;
+  campaignTitle: string;
 };
 
 export default function AdminPage() {
@@ -44,6 +77,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [storageMode, setStorageMode] = useState<"local" | "supabase" | "">("");
+  const [stageOptions, setStageOptions] = useState<StageOption[]>([]);
   const [filter, setFilter] = useState<"all" | "pending" | "active" | "new" | "advanced">("all");
   const isAdmin = isAdminEmail(session?.email);
   const analytics = useMemo(() => getAdminAnalytics(rows), [rows]);
@@ -84,7 +118,7 @@ export default function AdminPage() {
         `/api/admin/storage-status?adminEmail=${encodeURIComponent(session.email)}`,
         { cache: "no-store" }
       );
-      const data = await response.json() as { rows?: AdminRow[]; error?: string };
+      const data = await response.json() as { rows?: AdminRow[]; stageOptions?: StageOption[]; error?: string };
       const storageData = await storageResponse.json() as { mode?: "local" | "supabase" };
 
       if (!response.ok) {
@@ -92,6 +126,7 @@ export default function AdminPage() {
       }
 
       setRows(data.rows ?? []);
+      setStageOptions(data.stageOptions ?? []);
       setStorageMode(storageData.mode ?? "");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erro ao carregar painel.");
@@ -126,7 +161,13 @@ export default function AdminPage() {
         }),
       }
     );
-    const data = await response.json() as { player?: Player; error?: string };
+    const data = await response.json() as {
+      player?: Player;
+      user?: LocalUser;
+      attempts?: AttemptSummary[];
+      snapshots?: ProgressSnapshotSummary[];
+      error?: string;
+    };
 
     if (!response.ok || !data.player) {
       setMessage(data.error ?? "Nao foi possivel atualizar progresso.");
@@ -135,10 +176,61 @@ export default function AdminPage() {
 
     setRows((currentRows) => currentRows.map((row) => (
       row.user.id === userId
-        ? { ...row, player: data.player as Player }
+        ? {
+          ...row,
+          user: data.user ?? row.user,
+          player: data.player as Player,
+          attempts: data.attempts ?? row.attempts,
+          snapshots: data.snapshots ?? row.snapshots,
+        }
         : row
     )));
     setMessage("Progresso atualizado.");
+  }
+
+  async function resetAllProgress() {
+    if (!session) {
+      return;
+    }
+
+    if (!window.confirm("Resetar a campanha de TODOS os usuarios mantendo itens comprados?")) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/admin/progress?adminEmail=${encodeURIComponent(session.email)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "resetAllProgress",
+          }),
+        }
+      );
+      const data = await response.json() as {
+        rows?: AdminRow[];
+        stageOptions?: StageOption[];
+        error?: string;
+      };
+
+      if (!response.ok || !data.rows) {
+        throw new Error(data.error ?? "Nao foi possivel resetar todos os usuarios.");
+      }
+
+      setRows(data.rows);
+      setStageOptions(data.stageOptions ?? stageOptions);
+      setMessage("Campanha resetada para todos os usuarios.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Erro ao resetar todos.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (!session || !isAdmin) {
@@ -171,9 +263,18 @@ export default function AdminPage() {
             </p>
           </div>
 
-          <button type="button" onClick={loadRows} className="cq-button cq-button-secondary">
-            Atualizar
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={loadRows} className="cq-button cq-button-secondary">
+              Atualizar
+            </button>
+            <button
+              type="button"
+              onClick={resetAllProgress}
+              className="cq-button cq-button-secondary border-red-300/50 text-red-100"
+            >
+              Resetar campanha de todos
+            </button>
+          </div>
         </div>
 
         {storageMode && (
@@ -221,9 +322,18 @@ export default function AdminPage() {
             <div className="cq-panel p-6 text-[#93a4bd]">Carregando usuarios...</div>
           ) : filteredRows.map((row) => (
             <AdminUserCard
-              key={`${row.user.id}-${row.player.coins}-${row.player.level}`}
+              key={[
+                row.user.id,
+                row.user.name,
+                row.player.coins,
+                row.player.level,
+                row.player.progress.stageId,
+                row.snapshots.length,
+                row.attempts.length,
+              ].join("-")}
               row={row}
               onUpdate={updateProgress}
+              stageOptions={stageOptions}
             />
           ))}
         </div>
@@ -278,14 +388,20 @@ function getAdminAnalytics(rows: AdminRow[]) {
 function AdminUserCard({
   row,
   onUpdate,
+  stageOptions,
 }: {
   row: AdminRow;
   onUpdate: (userId: string, patch: AdminProgressPatch) => void;
+  stageOptions: StageOption[];
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [name, setName] = useState(row.user.name);
   const [coins, setCoins] = useState(String(row.player.coins));
   const [level, setLevel] = useState(String(row.player.level));
+  const [newPassword, setNewPassword] = useState("");
+  const [stageId, setStageId] = useState(row.player.progress.stageId);
   const [rewardId, setRewardId] = useState(rewardItems[0]?.id ?? "");
+  const [snapshotId, setSnapshotId] = useState(row.snapshots[0]?.id ?? "");
   const [examTitle, setExamTitle] = useState("Prova surpresa");
   const [examQuestion, setExamQuestion] = useState("Qual comando lista todos os clientes?");
   const [examOptions, setExamOptions] = useState("SELECT * FROM clientes\nSELECT clientes\nGET clientes");
@@ -295,6 +411,10 @@ function AdminUserCard({
 
   const completedCount = row.player.progress.completedStages.length;
   const selectedReward = rewardItems.find((reward) => reward.id === rewardId);
+  const currentStage = stageOptions.find((stage) => stage.id === row.player.progress.stageId);
+  const selectedSnapshot = row.snapshots.find((snapshot) => snapshot.id === (snapshotId || row.snapshots[0]?.id));
+  const ownedRewards = rewardItems.filter((reward) => row.player.inventory.ownedRewardIds.includes(reward.id));
+  const equippedRewards = getEquippedRewards(row.player);
 
   return (
     <article className="cq-card p-5">
@@ -315,6 +435,9 @@ function AdminUserCard({
             <span>{row.player.coins} moedas</span>
             <span>{row.player.xp} XP</span>
             <span>{completedCount} fases</span>
+            <span className="md:col-span-4">
+              Atual: {currentStage ? `${currentStage.campaignTitle} / ${currentStage.title}` : row.player.progress.stageId}
+            </span>
           </div>
         </div>
 
@@ -330,6 +453,15 @@ function AdminUserCard({
 
       {expanded && (
         <div className="mt-6 grid gap-3 border-t border-[#26384f] pt-5 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
+          <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#93a4bd] sm:col-span-2">
+            Nome
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="min-h-11 border border-[#26384f] bg-[#0b1424] px-3 font-mono text-sm text-[#f3f7ff] outline-none focus:border-[#6f91d8]"
+            />
+          </label>
+
           <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#93a4bd]">
             Moedas
             <input
@@ -354,10 +486,64 @@ function AdminUserCard({
 
           <button
             type="button"
-            onClick={() => onUpdate(row.user.id, { coins: Number(coins), level: Number(level) })}
+            onClick={() => onUpdate(row.user.id, { name, coins: Number(coins), level: Number(level) })}
             className="cq-button sm:col-span-2"
           >
-            Salvar progresso
+            Salvar nome/nivel/moedas
+          </button>
+
+          <div className="cq-panel p-4 sm:col-span-2">
+            <p className="cq-kicker">Senha</p>
+            <p className="mt-2 text-sm text-[#93a4bd]">
+              Redefine a senha do usuario sem mostrar a senha antiga.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                className="min-h-11 border border-[#26384f] bg-[#0b1424] px-3 font-mono text-sm text-[#f3f7ff] outline-none focus:border-[#6f91d8]"
+                placeholder="Nova senha com 6+ caracteres"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (newPassword.trim().length < 6) {
+                    window.alert("A senha precisa ter pelo menos 6 caracteres.");
+                    return;
+                  }
+
+                  onUpdate(row.user.id, { action: "resetPassword", password: newPassword });
+                  setNewPassword("");
+                }}
+                className="cq-button cq-button-secondary"
+              >
+                Redefinir
+              </button>
+            </div>
+          </div>
+
+          <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#93a4bd] sm:col-span-2">
+            Fase atual
+            <select
+              value={stageId}
+              onChange={(event) => setStageId(event.target.value)}
+              className="min-h-11 border border-[#26384f] bg-[#0b1424] px-3 font-mono text-sm text-[#f3f7ff] outline-none focus:border-[#6f91d8]"
+            >
+              {stageOptions.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.campaignTitle} / {stage.chapterTitle} / {stage.title}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            onClick={() => onUpdate(row.user.id, { stageId })}
+            className="cq-button cq-button-secondary sm:col-span-2"
+          >
+            Trocar fase atual
           </button>
 
           <button
@@ -375,6 +561,55 @@ function AdminUserCard({
           >
             +1 nivel
           </button>
+
+          <button
+            type="button"
+            onClick={() => onUpdate(row.user.id, { action: "toggleRewardsLock" })}
+            className={[
+              "cq-button cq-button-secondary sm:col-span-2",
+              row.player.inventory.rewardsLocked
+                ? "border-yellow-300/50 text-yellow-100"
+                : "border-red-300/50 text-red-100",
+            ].join(" ")}
+          >
+            {row.player.inventory.rewardsLocked
+              ? "Desbloquear loja do usuario"
+              : "Bloquear loja do usuario"}
+          </button>
+
+          <div className="cq-panel p-4 sm:col-span-2">
+            <p className="cq-kicker">Itens do usuario</p>
+            <div className="mt-4 grid gap-3 text-sm text-[#c8d3e3]">
+              <div>
+                <p className="font-mono text-xs font-black uppercase tracking-[0.12em] text-[#93a4bd]">
+                  Equipados
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {equippedRewards.length === 0 ? (
+                    <span className="text-[#6f86a8]">Nada equipado.</span>
+                  ) : equippedRewards.map((reward) => (
+                    <span key={reward.id} className="cq-badge">
+                      {getRewardKindLabel(reward.kind)}: {reward.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="font-mono text-xs font-black uppercase tracking-[0.12em] text-[#93a4bd]">
+                  Comprados/liberados
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ownedRewards.length === 0 ? (
+                    <span className="text-[#6f86a8]">Nenhum item liberado.</span>
+                  ) : ownedRewards.map((reward) => (
+                    <span key={reward.id} className="cq-badge border-[#3d5f92]">
+                      {reward.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
 
           <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#93a4bd] sm:col-span-2">
             Recompensa
@@ -484,17 +719,117 @@ function AdminUserCard({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm(`Resetar progresso de ${row.user.name}?`)) {
-                onUpdate(row.user.id, { action: "reset" });
-              }
-            }}
-            className="cq-button cq-button-secondary border-red-300/50 text-red-100 sm:col-span-2"
-          >
-            Resetar progresso
-          </button>
+          <div className="cq-panel p-4 sm:col-span-2">
+            <p className="cq-kicker">Historico recente</p>
+            <div className="mt-4 space-y-3">
+              {row.attempts.length === 0 ? (
+                <p className="text-sm text-[#93a4bd]">Nenhuma tentativa registrada ainda.</p>
+              ) : row.attempts.map((attempt) => (
+                <div key={attempt.id ?? `${attempt.stageId}-${attempt.createdAt}`} className="rounded border border-[#26384f] bg-[#07101d] p-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`cq-badge ${attempt.success ? "border-green-300/40 text-green-100" : "border-red-300/40 text-red-100"}`}>
+                      {attempt.success ? "Acertou" : "Errou"}
+                    </span>
+                    <span className="text-[#dbe8ff]">{attempt.stepTitle || attempt.stageId}</span>
+                  </div>
+                  <p className="mt-2 break-words font-mono text-xs text-[#93a4bd]">
+                    {attempt.answer}
+                  </p>
+                  <p className="mt-2 text-xs text-[#6f86a8]">
+                    {formatDate(attempt.createdAt)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="cq-panel p-4 sm:col-span-2">
+            <p className="cq-kicker">Backups de progresso</p>
+            {row.snapshots.length === 0 ? (
+              <p className="mt-3 text-sm text-[#93a4bd]">
+                Nenhum backup ainda. Eles aparecem quando houver mudanca real de progresso.
+              </p>
+            ) : (
+              <div className="mt-4 grid gap-3">
+                <select
+                  value={snapshotId || row.snapshots[0]?.id || ""}
+                  onChange={(event) => setSnapshotId(event.target.value)}
+                  className="min-h-11 border border-[#26384f] bg-[#0b1424] px-3 font-mono text-sm text-[#f3f7ff] outline-none focus:border-[#6f91d8]"
+                >
+                  {row.snapshots.map((snapshot) => (
+                    <option key={snapshot.id} value={snapshot.id}>
+                      {formatDate(snapshot.createdAt)} - Nv {snapshot.player.level} - {snapshot.player.coins} moedas
+                    </option>
+                  ))}
+                </select>
+                {selectedSnapshot && (
+                  <div className="rounded border border-[#26384f] bg-[#07101d] p-3 text-sm text-[#c8d3e3]">
+                    <p className="font-mono text-xs font-black uppercase tracking-[0.12em] text-[#93a4bd]">
+                      Previa do backup
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <span>Nivel {selectedSnapshot.player.level}</span>
+                      <span>{selectedSnapshot.player.coins} moedas</span>
+                      <span>{selectedSnapshot.player.xp} XP</span>
+                      <span>{selectedSnapshot.player.progress.completedStages.length} fases concluidas</span>
+                      <span className="sm:col-span-2">
+                        Fase: {selectedSnapshot.player.progress.stageId || "inicio"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const selectedSnapshotId = snapshotId || row.snapshots[0]?.id;
+
+                    if (selectedSnapshotId && window.confirm(`Restaurar backup de ${row.user.name}?`)) {
+                      onUpdate(row.user.id, {
+                        action: "restoreSnapshot",
+                        snapshotId: selectedSnapshotId,
+                      });
+                    }
+                  }}
+                  className="cq-button cq-button-secondary border-yellow-300/50 text-yellow-100"
+                >
+                  Restaurar backup selecionado
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="cq-panel p-4 sm:col-span-2">
+            <p className="cq-kicker">Reset</p>
+            <p className="mt-2 text-sm leading-6 text-[#93a4bd]">
+              Use o reset de campanha quando mudar a quantidade de missoes. Ele volta fase, XP,
+              nivel, moedas e conquistas para o inicio, mas mantem fotos, pets, temas e itens liberados.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Resetar campanha de ${row.user.name} mantendo os itens comprados?`)) {
+                    onUpdate(row.user.id, { action: "resetProgress" });
+                  }
+                }}
+                className="cq-button cq-button-secondary border-yellow-300/50 text-yellow-100"
+              >
+                Resetar campanha
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Reset TOTAL de ${row.user.name}? Isso apaga tambem itens/equipamentos.`)) {
+                    onUpdate(row.user.id, { action: "reset" });
+                  }
+                }}
+                className="cq-button cq-button-secondary border-red-300/50 text-red-100"
+              >
+                Reset total
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </article>
@@ -507,6 +842,31 @@ function getRewardKindLabel(kind: RewardKind) {
   if (kind === "theme") return "Tema";
   if (kind === "frame") return "Moldura";
   return "Efeito";
+}
+
+function getEquippedRewards(player: Player) {
+  const equippedIds = [
+    player.inventory.equippedAvatarId ?? player.avatar,
+    player.inventory.equippedPetId,
+    player.inventory.equippedThemeId,
+    player.inventory.equippedFrameId,
+    player.inventory.equippedEffectId,
+  ].filter(Boolean);
+
+  return rewardItems.filter((reward) => equippedIds.includes(reward.id));
+}
+
+function formatDate(value?: string) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function parseJson<T>(value: string) {

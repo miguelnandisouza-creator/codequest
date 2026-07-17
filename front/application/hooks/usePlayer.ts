@@ -6,7 +6,7 @@ import {
   getLocalSession,
   subscribeToLocalAuth,
 } from "@/application/auth/localAuth";
-import { rewardItems, RewardKind } from "@/data/rewards";
+import { PetAbility, rewardItems, RewardKind } from "@/data/rewards";
 import { Player } from "@/domain/entities/player";
 import {
   completeStage,
@@ -16,6 +16,9 @@ import {
   loadPlayer,
   savePlayer,
 } from "@/infrastructure/storage/playerStorage";
+import {
+  unlockEligibleAchievements,
+} from "@/data/achievements";
 
 type Listener = () => void;
 
@@ -81,17 +84,21 @@ function getServerSnapshot() {
 
 function updatePlayer(updater: (player: Player) => Player) {
   hydratePlayer();
-  currentPlayer = markUpdated(updater(currentPlayer));
+  const result = applyAchievementUnlocks(updater(currentPlayer));
+  currentPlayer = markUpdated(result.player);
   savePlayer(currentPlayer, activeUserId);
   void savePlayerToServer(currentPlayer);
   emitPlayerChange();
+  notifyAchievements(result.unlocked);
 }
 
 function replacePlayer(player: Player) {
-  currentPlayer = markUpdated(player);
+  const result = applyAchievementUnlocks(player);
+  currentPlayer = markUpdated(result.player);
   savePlayer(currentPlayer, activeUserId);
   void savePlayerToServer(currentPlayer);
   emitPlayerChange();
+  notifyAchievements(result.unlocked);
 }
 
 function emitPlayerChange() {
@@ -191,7 +198,38 @@ function markUpdated(player: Player): Player {
   };
 }
 
+function applyAchievementUnlocks(player: Player) {
+  return unlockEligibleAchievements(player);
+}
+
+function notifyAchievements(achievements: Player["achievements"]) {
+  if (typeof window === "undefined" || achievements.length === 0) {
+    return;
+  }
+
+  for (const achievement of achievements) {
+    window.dispatchEvent(new CustomEvent("codequest-achievement-unlocked", {
+      detail: { achievement },
+    }));
+  }
+}
+
 function isLocalPlayerNewer(localPlayer: Player, serverPlayer: Player) {
+  const localTime = Date.parse(localPlayer.updatedAt ?? "");
+  const serverTime = Date.parse(serverPlayer.updatedAt ?? "");
+
+  if (Number.isFinite(localTime) && Number.isFinite(serverTime) && localTime !== serverTime) {
+    return localTime > serverTime;
+  }
+
+  if (!Number.isFinite(localTime) && Number.isFinite(serverTime)) {
+    return false;
+  }
+
+  if (Number.isFinite(localTime) && !Number.isFinite(serverTime)) {
+    return true;
+  }
+
   const localProgressScore = getProgressScore(localPlayer);
   const serverProgressScore = getProgressScore(serverPlayer);
 
@@ -206,17 +244,6 @@ function isLocalPlayerNewer(localPlayer: Player, serverPlayer: Player) {
 
   if (localOwnedSignature !== serverOwnedSignature) {
     return localOwnedRewards.length > serverOwnedRewards.length;
-  }
-
-  const localTime = Date.parse(localPlayer.updatedAt ?? "");
-  const serverTime = Date.parse(serverPlayer.updatedAt ?? "");
-
-  if (Number.isFinite(localTime) && Number.isFinite(serverTime) && localTime !== serverTime) {
-    return localTime > serverTime;
-  }
-
-  if (Number.isFinite(localTime) && !Number.isFinite(serverTime)) {
-    return true;
   }
 
   return getInventorySignature(localPlayer) !== getInventorySignature(serverPlayer);
@@ -261,10 +288,29 @@ export function usePlayer() {
 
   return {
     player,
+    petAbility: getEquippedPetAbility(player),
+    petAbilityReady: isEquippedPetAbilityReady(player),
+    hintPenaltyCost: getHintPenaltyCost(player),
     completeStage(stageId: string, reward: { xp: number; coins: number }) {
-      updatePlayer((current) => (
-        completeStage(current, stageId, reward)
-      ));
+      let message = "";
+
+      updatePlayer((current) => {
+        const ability = getEquippedPetAbility(current);
+        const adjustedReward = applyPetRewardBonus(reward, current, stageId, ability);
+        const nextPlayer = completeStage(current, stageId, adjustedReward);
+
+        if (nextPlayer !== current && ability?.celebrationMessage) {
+          message = ability.celebrationMessage;
+        }
+
+        return nextPlayer;
+      });
+
+      if (message) {
+        window.dispatchEvent(new CustomEvent("codequest-pet-say", {
+          detail: { message },
+        }));
+      }
     },
     resetProgress() {
       replacePlayer(initialPlayer);
@@ -280,6 +326,26 @@ export function usePlayer() {
         ...current,
         level: Math.max(1, current.level + amount),
       }));
+    },
+    applyHintPenalty(previousProgress?: {
+      campaignId: string;
+      chapterId: string;
+      stageId: string;
+    }) {
+      updatePlayer((current) => {
+        const penalty = getHintPenaltyCost(current);
+        const nextLevel = Math.max(1, current.level - penalty);
+
+        return {
+          ...current,
+          level: nextLevel,
+          progress: {
+            ...current.progress,
+            ...previousProgress,
+            level: Math.max(1, current.progress.level - penalty),
+          },
+        };
+      });
     },
     completeSurpriseExam() {
       updatePlayer((current) => {
@@ -300,6 +366,10 @@ export function usePlayer() {
     },
     buyReward(rewardId: string) {
       updatePlayer((current) => {
+        if (current.inventory.rewardsLocked) {
+          return current;
+        }
+
         const reward = rewardItems.find((item) => item.id === rewardId);
 
         if (!reward || !canUseReward(reward)) {
@@ -329,6 +399,10 @@ export function usePlayer() {
     },
     equipReward(rewardId: string, kind: RewardKind) {
       updatePlayer((current) => {
+        if (current.inventory.rewardsLocked) {
+          return current;
+        }
+
         const reward = rewardItems.find((item) => item.id === rewardId);
 
         if (!reward || !canUseReward(reward)) {
@@ -371,5 +445,60 @@ export function usePlayer() {
         detail: { message },
       }));
     },
+  };
+}
+
+function getEquippedPetAbility(player: Player): PetAbility | undefined {
+  const equippedPet = rewardItems.find((reward) => (
+    reward.kind === "pet" &&
+    reward.id === player.inventory.equippedPetId
+  ));
+
+  return equippedPet?.petAbility;
+}
+
+function getHintPenaltyCost(player: Player) {
+  const reduction = isEquippedPetAbilityReady(player)
+    ? getEquippedPetAbility(player)?.hintPenaltyReduction ?? 0
+    : 0;
+
+  return Math.max(0, 3 - reduction);
+}
+
+function isEquippedPetAbilityReady(player: Player) {
+  const ability = getEquippedPetAbility(player);
+
+  if (!ability?.cooldownMissions) {
+    return true;
+  }
+
+  const cycle = ability.cooldownMissions + 1;
+
+  return player.progress.completedStages.length % cycle === 0;
+}
+
+function applyPetRewardBonus(
+  reward: { xp: number; coins: number },
+  player: Player,
+  stageId: string,
+  ability?: PetAbility
+) {
+  const alreadyCompleted = player.progress.completedStages.includes(stageId);
+  const completedAfterThisStage = alreadyCompleted
+    ? player.progress.completedStages.length
+    : player.progress.completedStages.length + 1;
+  const intervalActive = Boolean(
+    ability?.intervalBonusMissions &&
+    completedAfterThisStage > 0 &&
+    completedAfterThisStage % ability.intervalBonusMissions === 0
+  );
+
+  return {
+    xp: Math.ceil(reward.xp * (1 + ((ability?.xpBonusPercent ?? 0) / 100)))
+      + (ability?.flatXpBonus ?? 0)
+      + (intervalActive ? ability?.intervalBonusXp ?? 0 : 0),
+    coins: Math.ceil(reward.coins * (1 + ((ability?.coinBonusPercent ?? 0) / 100)))
+      + (ability?.flatCoinBonus ?? 0)
+      + (intervalActive ? ability?.intervalBonusCoins ?? 0 : 0),
   };
 }

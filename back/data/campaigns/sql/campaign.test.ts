@@ -7,7 +7,14 @@ describe("sqlCampaign", () => {
     expect(sqlCampaign.chapters).toHaveLength(5);
     expect(
       sqlCampaign.chapters.flatMap((chapter) => chapter.stages)
-    ).toHaveLength(38);
+    ).toHaveLength(100);
+    expect(sqlCampaign.chapters.map((chapter) => chapter.stages.length)).toEqual([
+      20,
+      20,
+      20,
+      20,
+      20,
+    ]);
   });
 
   it("keeps every chapter populated and ordered", () => {
@@ -34,6 +41,36 @@ describe("sqlCampaign", () => {
     }
   });
 
+  it("keeps foundation narration compact in the first modules", () => {
+    const foundationStages = sqlCampaign.chapters
+      .filter((chapter) => ["sql-chapter-1", "sql-chapter-2"].includes(chapter.id))
+      .flatMap((chapter) => chapter.stages);
+
+    for (const stage of foundationStages) {
+      const narrationSteps = stage.content.filter((content) => content.type === "text");
+
+      expect(narrationSteps, stage.id).toHaveLength(1);
+    }
+  });
+
+  it("does not give away foundation challenge answers in hints", () => {
+    const foundationStages = sqlCampaign.chapters
+      .filter((chapter) => ["sql-chapter-1", "sql-chapter-2"].includes(chapter.id))
+      .flatMap((chapter) => chapter.stages);
+
+    for (const stage of foundationStages) {
+      for (const content of stage.content) {
+        if (content.type !== "challenge" && content.type !== "boss") {
+          continue;
+        }
+
+        expect(normalizeSqlHint(content.hint), stage.id).not.toContain(
+          normalizeSqlHint(content.expectedAnswer)
+        );
+      }
+    }
+  });
+
   it("uses every content mode supported by the adventure engine", () => {
     const contentTypes = new Set(
       sqlCampaign.chapters.flatMap((chapter) => (
@@ -48,3 +85,11 @@ describe("sqlCampaign", () => {
     );
   });
 });
+
+function normalizeSqlHint(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[.;]/g, "")
+    .trim();
+}

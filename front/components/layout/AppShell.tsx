@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { ReactNode, useMemo, useSyncExternalStore } from "react";
 
 import AuthStatus from "./AuthStatus";
+import AchievementToastHub from "@/components/achievements/AchievementToastHub";
+import ChatNotificationHub from "@/components/chat/ChatNotificationHub";
 import {
   getLocalSessionSnapshot,
   getServerLocalSessionSnapshot,
@@ -61,11 +63,20 @@ export default function AppShell({ children }: Props) {
             <Link href="/journey" className="rounded px-2 py-1 hover:bg-white/5 hover:text-white">
               Jornada
             </Link>
+            <Link href="/review" className="rounded px-2 py-1 hover:bg-white/5 hover:text-white">
+              Revisao
+            </Link>
             <Link href="/account" className="rounded px-2 py-1 hover:bg-white/5 hover:text-white">
               Conta
             </Link>
             <Link href="/rewards" className="rounded px-2 py-1 hover:bg-white/5 hover:text-white">
               Loja
+            </Link>
+            <Link href="/chat" className="rounded px-2 py-1 hover:bg-white/5 hover:text-white">
+              Chat
+            </Link>
+            <Link href="/ranking" className="rounded px-2 py-1 hover:bg-white/5 hover:text-white">
+              Ranking
             </Link>
             <Link href="/settings" className="rounded px-2 py-1 hover:bg-white/5 hover:text-white">
               Config
@@ -83,6 +94,8 @@ export default function AppShell({ children }: Props) {
 
       {children}
       <RewardStyleSync />
+      <ChatNotificationHub />
+      <AchievementToastHub />
       <SurpriseExamModal />
       <PetCompanion />
     </>

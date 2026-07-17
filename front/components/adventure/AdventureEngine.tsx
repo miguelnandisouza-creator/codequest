@@ -12,6 +12,7 @@ import {
 } from "@/domain/game/progression";
 import ChallengeStep from "./ChallengeStep";
 import ExampleStep from "./ExampleStep";
+import LearningNotebook from "./LearningNotebook";
 import Link from "next/link";
 import PixelScene from "./PixelScene";
 import QuizStep from "./QuizStep";
@@ -42,6 +43,13 @@ export default function AdventureEngine({
   const isLastStep = step === stage.content.length - 1;
   const nextLabel = isLastStep ? "Concluir etapa" : "Proximo";
   const language = stage.language ?? "sql";
+  const gatedHint = chapter.order >= 4 && campaign.id === "sql"
+    ? {
+      enabled: true,
+      attemptsRequired: 4,
+      previousProgress: getPreviousStageProgress(campaign, stage.id),
+    }
+    : undefined;
   const stageStatus = getStageProgressStatus(chapter, stage, player);
   const unlocked = (
     isChapterUnlocked(campaign, chapter, player) &&
@@ -72,8 +80,27 @@ export default function AdventureEngine({
     });
   }
 
+  function reviewTheory() {
+    setStep(0);
+    setSceneResolved(false);
+    window.requestAnimationFrame(() => {
+      sceneRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
+      {unlocked && !completed && (
+        <LearningNotebook
+          stage={stage}
+          current={current}
+          language={language}
+        />
+      )}
+
       <div ref={sceneRef} className="scroll-mt-24">
         <PixelScene
           stage={stage}
@@ -131,6 +158,7 @@ export default function AdventureEngine({
         <div className="cq-panel p-6 md:p-8">
           {current.type === "text" && (
             <TextStep
+              key={`${stage.id}-${step}`}
               title={current.title}
               content={current.content}
               onNext={next}
@@ -140,6 +168,7 @@ export default function AdventureEngine({
 
           {current.type === "example" && (
             <ExampleStep
+              key={`${stage.id}-${step}`}
               title={current.title}
               explanation={current.explanation}
               code={current.code}
@@ -151,19 +180,24 @@ export default function AdventureEngine({
 
           {current.type === "challenge" && (
             <ChallengeStep
+              key={`${stage.id}-${step}`}
+              stageId={stage.id}
               title={current.title}
               objective={current.objective}
               expectedAnswer={current.expectedAnswer}
               hint={current.hint}
               language={language}
+              gatedHint={gatedHint}
               onSuccess={next}
               onSolved={resolveScene}
+              onReviewTheory={reviewTheory}
               successLabel={nextLabel}
             />
           )}
 
           {current.type === "quiz" && (
             <QuizStep
+              stageId={stage.id}
               title={current.title}
               question={current.question}
               options={current.options}
@@ -177,13 +211,17 @@ export default function AdventureEngine({
 
           {current.type === "boss" && (
             <ChallengeStep
+              key={`${stage.id}-${step}`}
+              stageId={stage.id}
               title={current.title}
               objective={current.objective}
               expectedAnswer={current.expectedAnswer}
               hint={current.hint}
               language={language}
+              gatedHint={gatedHint}
               onSuccess={next}
               onSolved={resolveScene}
+              onReviewTheory={reviewTheory}
               successLabel={nextLabel}
             />
           )}
@@ -191,4 +229,21 @@ export default function AdventureEngine({
       )}
     </div>
   );
+}
+
+function getPreviousStageProgress(campaign: Campaign, stageId: string) {
+  const stages = campaign.chapters
+    .toSorted((left, right) => left.order - right.order)
+    .flatMap((chapter) => (
+      chapter.stages
+        .toSorted((left, right) => left.order - right.order)
+        .map((stage) => ({
+          campaignId: campaign.id,
+          chapterId: chapter.id,
+          stageId: stage.id,
+        }))
+    ));
+  const stageIndex = stages.findIndex((stage) => stage.stageId === stageId);
+
+  return stageIndex > 0 ? stages[stageIndex - 1] : undefined;
 }

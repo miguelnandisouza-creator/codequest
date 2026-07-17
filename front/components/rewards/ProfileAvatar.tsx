@@ -16,11 +16,7 @@ export default function ProfileAvatar({ size = "sm" }: Props) {
     ?? rewardItems.find((item) => item.kind === "avatar");
   const dimensions = size === "lg" ? "size-24" : "size-10";
   const textSize = size === "lg" ? "text-xl" : "text-xs";
-  const frameClass = player.inventory.equippedFrameId === "frame-gold"
-    ? "cq-avatar-frame-gold"
-    : player.inventory.equippedFrameId === "frame-crystal"
-      ? "cq-avatar-frame-crystal"
-      : "";
+  const frameClass = getFrameClass(player.inventory.equippedFrameId);
 
   return (
     <span
@@ -42,4 +38,12 @@ export default function ProfileAvatar({ size = "sm" }: Props) {
       )}
     </span>
   );
+}
+
+function getFrameClass(frameId?: string) {
+  if (!frameId?.startsWith("frame-")) {
+    return "";
+  }
+
+  return `cq-avatar-frame-${frameId.replace("frame-", "")}`;
 }

@@ -1,4 +1,6 @@
 import { Player } from "@/domain/entities/player";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
+import path from "node:path";
 import {
   mergePlayer,
   readPlayerProgress as readFilePlayerProgress,
@@ -6,10 +8,21 @@ import {
 } from "@/infrastructure/storage/serverPlayerStorage";
 import { getSupabaseServerClient } from "./serverClient";
 
+const dataDir = path.join(process.cwd(), ".data");
+const snapshotsFile = path.join(dataDir, "progress-snapshots.jsonl");
+
 type PlayerProgressRow = {
   user_id: string;
   player: Partial<Player>;
   updated_at: string;
+};
+
+export type ProgressSnapshot = {
+  id: string;
+  userId: string;
+  player: Player;
+  reason: string;
+  createdAt: string;
 };
 
 export async function readPlayerProgress(userId: string) {
@@ -54,12 +67,18 @@ export async function writePlayerProgress(
     updatedAt: player.updatedAt ?? new Date().toISOString(),
   });
   const existingPlayer = options.forceOverwrite
-    ? null
+    ? await readExistingProgress(userId)
     : await readExistingProgress(userId);
   const mergedPlayer = existingPlayer
-    ? mergeSafeProgress(existingPlayer, incomingPlayer)
+    ? options.forceOverwrite
+      ? incomingPlayer
+      : mergeSafeProgress(existingPlayer, incomingPlayer)
     : incomingPlayer;
   const supabase = getSupabaseServerClient();
+
+  if (existingPlayer && shouldSnapshot(existingPlayer, mergedPlayer)) {
+    await saveProgressSnapshot(userId, existingPlayer, options.forceOverwrite ? "force_overwrite" : "before_write");
+  }
 
   await writeFilePlayerProgress(userId, mergedPlayer);
 
@@ -80,6 +99,112 @@ export async function writePlayerProgress(
   }
 
   return mergedPlayer;
+}
+
+export async function readProgressSnapshots(userId: string, limit = 10) {
+  const safeLimit = Math.min(Math.max(limit, 1), 50);
+  const supabase = getSupabaseServerClient();
+
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("progress_snapshots")
+      .select("id, user_id, player, reason, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(safeLimit);
+
+    if (!error && data) {
+      return data.map((row) => ({
+        id: String(row.id),
+        userId: String(row.user_id),
+        player: mergePlayer({
+          ...(row.player as Partial<Player>),
+          id: String(row.user_id),
+        }),
+        reason: String(row.reason ?? ""),
+        createdAt: String(row.created_at),
+      }));
+    }
+
+    console.warn("Supabase read progress_snapshots failed:", error?.message);
+  }
+
+  try {
+    const raw = await readFile(snapshotsFile, "utf8");
+    return raw
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as ProgressSnapshot)
+      .filter((snapshot) => snapshot.userId === userId)
+      .slice(-safeLimit)
+      .reverse();
+  } catch {
+    return [];
+  }
+}
+
+export async function restoreProgressSnapshot(userId: string, snapshotId: string) {
+  const snapshots = await readProgressSnapshots(userId, 50);
+  const snapshot = snapshots.find((item) => item.id === snapshotId);
+
+  if (!snapshot) {
+    throw new Error("Snapshot nao encontrado.");
+  }
+
+  return writePlayerProgress(userId, {
+    ...snapshot.player,
+    id: userId,
+    updatedAt: new Date().toISOString(),
+  }, { forceOverwrite: true });
+}
+
+async function saveProgressSnapshot(userId: string, player: Player, reason: string) {
+  const snapshot = {
+    id: crypto.randomUUID(),
+    userId,
+    player,
+    reason,
+    createdAt: new Date().toISOString(),
+  };
+  const supabase = getSupabaseServerClient();
+
+  if (supabase) {
+    const { error } = await supabase
+      .from("progress_snapshots")
+      .insert({
+        user_id: userId,
+        player,
+        reason,
+        created_at: snapshot.createdAt,
+      });
+
+    if (!error) {
+      return;
+    }
+
+    console.warn("Supabase insert progress_snapshots failed:", error.message);
+  }
+
+  await mkdir(dataDir, { recursive: true });
+  await appendFile(snapshotsFile, `${JSON.stringify(snapshot)}\n`, "utf8");
+}
+
+function shouldSnapshot(existing: Player, next: Player) {
+  return getSnapshotSignature(existing) !== getSnapshotSignature(next);
+}
+
+function getSnapshotSignature(player: Player) {
+  return JSON.stringify({
+    xp: player.xp,
+    level: player.level,
+    coins: player.coins,
+    streak: player.streak,
+    avatar: player.avatar,
+    achievements: player.achievements,
+    progress: player.progress,
+    inventory: player.inventory,
+    surpriseExam: player.surpriseExam,
+  });
 }
 
 async function readExistingProgress(userId: string) {
@@ -109,6 +234,8 @@ async function readExistingProgress(userId: string) {
 }
 
 function mergeSafeProgress(existing: Player, incoming: Player) {
+  const existingTime = Date.parse(existing.updatedAt ?? "");
+  const incomingTime = Date.parse(incoming.updatedAt ?? "");
   const completedStages = Array.from(new Set([
     ...existing.progress.completedStages,
     ...incoming.progress.completedStages,
@@ -117,6 +244,22 @@ function mergeSafeProgress(existing: Player, incoming: Player) {
     ...existing.inventory.ownedRewardIds,
     ...incoming.inventory.ownedRewardIds,
   ]));
+
+  if (
+    Number.isFinite(existingTime) &&
+    Number.isFinite(incomingTime) &&
+    existingTime > incomingTime
+  ) {
+    return mergePlayer({
+      ...existing,
+      inventory: {
+        ...existing.inventory,
+        ownedRewardIds,
+      },
+      updatedAt: existing.updatedAt,
+    });
+  }
+
   const incomingIsAhead = getProgressScore(incoming) >= getProgressScore(existing);
 
   return mergePlayer({

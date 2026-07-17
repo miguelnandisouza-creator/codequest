@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 .data/
+/tmp/
+/public/uploads/chat/*
+!/public/uploads/chat/.gitkeep
 
 # debug
 npm-debug.log*

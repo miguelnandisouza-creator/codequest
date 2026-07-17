@@ -15,6 +15,7 @@ import { campaigns } from "@/data/campaigns";
 import ProfileAvatar from "@/components/rewards/ProfileAvatar";
 import { usePlayer } from "@/application/hooks/usePlayer";
 import { isAdminEmail } from "@/data/admin";
+import { getAchievementCatalog } from "@/data/achievements";
 
 function subscribeToOnboardingStorage(callback: () => void) {
   window.addEventListener("storage", callback);
@@ -69,6 +70,15 @@ export default function AccountPage() {
       .filter((campaign): campaign is (typeof campaigns)[number] => Boolean(campaign));
   }, [onboarding]);
   const isAdmin = isAdminEmail(session?.email);
+  const achievements = useMemo(() => {
+    const unlockedIds = new Set(player.achievements.map((achievement) => achievement.id));
+
+    return getAchievementCatalog().map((achievement) => ({
+      ...achievement,
+      unlocked: unlockedIds.has(achievement.id),
+    }));
+  }, [player.achievements]);
+  const unlockedAchievements = achievements.filter((achievement) => achievement.unlocked);
 
   function handleAdminCoins(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -140,6 +150,54 @@ export default function AccountPage() {
           <InfoCard label="Conta criada" value={formatDate(user?.createdAt)} />
           <InfoCard label="Sessao iniciada" value={formatDate(session.startedAt)} />
         </div>
+
+        <section className="cq-panel mt-8 p-6">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="cq-kicker">Conquistas</p>
+              <h2 className="cq-title mt-3 text-2xl">
+                {unlockedAchievements.length}/{achievements.length} desbloqueadas
+              </h2>
+            </div>
+            <p className="max-w-xl text-sm leading-6 text-[#93a4bd]">
+              Elas aparecem aqui na conta e avisam na tela quando voce desbloqueia, no estilo conquista de console.
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {achievements.map((achievement) => (
+              <div
+                key={achievement.id}
+                className={[
+                  "border p-4 transition",
+                  achievement.unlocked
+                    ? "border-[#74f0a7]/55 bg-[#10203a]"
+                    : "border-[#26384f] bg-[#07101d]/80 opacity-55",
+                ].join(" ")}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={[
+                    "grid h-12 w-12 place-items-center border font-mono text-xs font-black",
+                    achievement.unlocked
+                      ? "border-[#74f0a7]/60 bg-[#0f2b23] text-[#dfffe9]"
+                      : "border-[#3d5f92] bg-[#0b1424] text-[#93a4bd]",
+                  ].join(" ")}>
+                    {achievement.icon}
+                  </div>
+                  <div>
+                    <h3 className="cq-title text-lg">{achievement.title}</h3>
+                    <span className="cq-badge mt-2 inline-flex">
+                      {achievement.unlocked ? "Liberada" : "Bloqueada"}
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-[#c8d3e3]">
+                  {achievement.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         {isAdmin && (
           <section className="cq-panel mt-8 p-6">

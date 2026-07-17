@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 
+import { recordAttempt } from "@/application/attempts/recordAttempt";
 import { usePlayer } from "@/application/hooks/usePlayer";
 import { stableShuffle } from "@/application/utils/shuffle";
 
 type Props = {
+  stageId: string;
   title: string;
   question: string;
   options: string[];
@@ -17,6 +19,7 @@ type Props = {
 };
 
 export default function QuizStep({
+  stageId,
   title,
   question,
   options,
@@ -51,12 +54,22 @@ export default function QuizStep({
           <button
             key={option}
             onClick={() => {
+              const success = option === correctAnswer;
               setSelectedAnswer(option);
-              petSay(option === correctAnswer
+              recordAttempt({
+                stageId,
+                stepTitle: title,
+                answer: option,
+                success,
+                feedback: success
+                  ? explanation
+                  : "Resposta incorreta no quiz.",
+              });
+              petSay(success
                 ? "Boa! Essa era a resposta certa!"
                 : "Quase! Revise a explicacao e tente outra opcao.");
 
-              if (option === correctAnswer) {
+              if (success) {
                 onSolved();
               }
             }}

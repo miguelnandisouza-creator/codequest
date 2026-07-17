@@ -121,6 +121,83 @@ export async function createStoredUser({
   return user;
 }
 
+export async function updateStoredUserName(userId: string, name: string) {
+  const nextName = name.trim();
+
+  if (nextName.length < 2) {
+    throw new Error("Digite um nome com pelo menos 2 letras.");
+  }
+
+  const supabase = getSupabaseServerClient();
+
+  if (supabase) {
+    const { error: userError } = await supabase
+      .from("codequest_users")
+      .update({ name: nextName })
+      .eq("id", userId);
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({ name: nextName })
+      .eq("id", userId);
+
+    if (!userError && !profileError) {
+      return;
+    }
+
+    console.warn("Supabase update user name failed:", userError?.message ?? profileError?.message);
+  }
+
+  const users = await readStoredUsers();
+  const updatedUsers = users.map((user) => (
+    user.id === userId
+      ? { ...user, name: nextName }
+      : user
+  ));
+
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(usersFile, JSON.stringify(updatedUsers, null, 2), "utf8");
+}
+
+export async function resetStoredUserPassword(userId: string, password: string) {
+  if (password.trim().length < 6) {
+    throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+  }
+
+  const passwordData = createPasswordData(password);
+  const supabase = getSupabaseServerClient();
+
+  if (supabase) {
+    const { error } = await supabase
+      .from("codequest_users")
+      .update({
+        password_hash: passwordData.passwordHash,
+        password_salt: passwordData.passwordSalt,
+        password_version: passwordData.passwordVersion,
+      })
+      .eq("id", userId);
+
+    if (!error) {
+      return;
+    }
+
+    console.warn("Supabase reset user password failed:", error.message);
+  }
+
+  const users = await readStoredUsers();
+  const updatedUsers = users.map((user) => (
+    user.id === userId
+      ? {
+        ...user,
+        password,
+        ...passwordData,
+      }
+      : user
+  ));
+
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(usersFile, JSON.stringify(updatedUsers, null, 2), "utf8");
+}
+
 function mapSupabaseUser(row: SupabaseUserRow): StoredUser {
   return {
     id: row.id,
@@ -139,11 +216,17 @@ function secureUserPassword(user: StoredUser): StoredUser {
     return user;
   }
 
+  return {
+    ...user,
+    ...createPasswordData(user.password),
+  };
+}
+
+function createPasswordData(password: string) {
   const passwordSalt = randomBytes(16).toString("hex");
 
   return {
-    ...user,
-    passwordHash: hashPassword(user.password, passwordSalt),
+    passwordHash: hashPassword(password, passwordSalt),
     passwordSalt,
     passwordVersion: 1,
   };

@@ -29,6 +29,7 @@ export type Player = {
     equippedThemeId?: string;
     equippedFrameId?: string;
     equippedEffectId?: string;
+    rewardsLocked?: boolean;
   };
 
   surpriseExam?: {

@@ -18,8 +18,9 @@ export default function PixelMentor({
 }: Props) {
   const lines = useMemo(() => splitDialog(content), [content]);
   const [lineIndex, setLineIndex] = useState(0);
-  const currentLine = lines[lineIndex];
-  const isLastLine = lineIndex === lines.length - 1;
+  const safeLineIndex = Math.min(lineIndex, lines.length - 1);
+  const currentLine = lines[safeLineIndex];
+  const isLastLine = safeLineIndex === lines.length - 1;
 
   const advance = useCallback(() => {
     if (!isLastLine) {
@@ -90,7 +91,7 @@ export default function PixelMentor({
 
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4 font-mono text-sm text-[#93a4bd]">
               <span>
-                Fala {lineIndex + 1} de {lines.length}
+                Fala {safeLineIndex + 1} de {lines.length}
               </span>
 
               <span>
@@ -105,10 +106,28 @@ export default function PixelMentor({
 }
 
 function splitDialog(content: string) {
-  const lines = content
-    .split(/(?<=[.!?])\s+/)
-    .map((line) => line.trim())
+  const paragraphs = content
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
     .filter(Boolean);
+  const lines = paragraphs.flatMap((paragraph) => {
+    const sentences = paragraph
+      .split(/(?<=[.!?])\s+/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (sentences.length <= 2) {
+      return [sentences.join(" ")];
+    }
+
+    const grouped: string[] = [];
+
+    for (let index = 0; index < sentences.length; index += 2) {
+      grouped.push(sentences.slice(index, index + 2).join(" "));
+    }
+
+    return grouped;
+  });
 
   return lines.length > 0 ? lines : [content];
 }

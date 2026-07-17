@@ -47,9 +47,48 @@ O progresso inteiro fica em:
 public.player_progress.player
 ```
 
-As tabelas `player_inventory`, `surprise_exams` e `attempts` ja estao criadas para a proxima etapa, quando a gente separar os dados em estruturas menores.
+Antes de cada mudanca real no progresso, o app salva uma copia em:
 
-## 5. Migrar dados locais
+```txt
+public.progress_snapshots
+```
+
+Cada resposta enviada pelo aluno fica em:
+
+```txt
+public.attempts
+```
+
+Mensagens de recados gerais e chats privados ficam em:
+
+```txt
+public.chat_messages
+```
+
+Videos enviados no chat ficam no Supabase Storage:
+
+```txt
+bucket: chat-videos
+path: chat/*
+```
+
+Com a `SUPABASE_SERVICE_ROLE_KEY`, o app tenta criar esse bucket publico automaticamente no primeiro upload. Se preferir criar manualmente, crie um bucket publico chamado `chat-videos`.
+
+As tabelas `player_inventory` e `surprise_exams` ja estao criadas para a proxima etapa, quando a gente separar os dados em estruturas menores.
+
+## 5. Deploy na Vercel
+
+Na Vercel, configure as mesmas variaveis do `.env.local` em Project Settings > Environment Variables:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+Nunca envie `.env.local` para o GitHub.
+
+## 6. Migrar dados locais
 
 Depois de preencher `.env.local` e rodar o schema no Supabase, execute:
 

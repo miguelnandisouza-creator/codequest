@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Serpente JOIN" shape-rendering="crispEdges">
+  <title>Serpente JOIN</title>
+  <rect x="0" y="0" width="128" height="128" fill="none"/>
+  
+  <rect x="26" y="104" width="76" height="8" fill="#000000" opacity="0.26"/>
+  
+  <rect x="26" y="82" width="76" height="16" fill="#22d3ee"/>
+  <rect x="82" y="52" width="28" height="34" fill="#22d3ee"/>
+  <rect x="92" y="60" width="7" height="7" fill="#164e63"/>
+  <rect x="106" y="60" width="7" height="7" fill="#164e63"/>
+  <rect x="98" y="76" width="22" height="4" fill="#a7f3d0"/>
+  <rect x="34" y="86" width="12" height="4" fill="#a7f3d0"/>
+  <rect x="58" y="86" width="12" height="4" fill="#164e63"/>
+  <rect x="76" y="86" width="12" height="4" fill="#a7f3d0"/>
+  <rect x="30" y="34" width="10" height="10" fill="#ffffff" opacity="0.16"/>
+  <rect x="92" y="42" width="8" height="8" fill="#ffffff" opacity="0.12"/>
+  <rect x="82" y="24" width="6" height="6" fill="#a7f3d0" opacity="0.75"/>
+</svg>

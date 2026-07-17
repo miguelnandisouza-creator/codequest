@@ -54,10 +54,10 @@ export default function PetCompanion() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-5 right-5 z-50 hidden md:block">
-      <div className="relative flex min-h-36 min-w-44 items-end justify-end">
+    <div className="pointer-events-none fixed bottom-5 left-5 z-50 hidden md:block">
+      <div className="relative flex min-h-36 min-w-44 items-end justify-start">
         {speech && (
-          <div className="cq-speech-bubble animate-cq-bubble absolute bottom-24 right-16">
+          <div className="cq-speech-bubble animate-cq-bubble absolute bottom-24 left-16">
             {speech}
           </div>
         )}
@@ -76,7 +76,10 @@ export default function PetCompanion() {
                 alt={pet.name}
                 fill
                 sizes="96px"
-                className="object-contain drop-shadow-[0_8px_0_rgba(0,0,0,0.25)]"
+                className={[
+                  "object-contain drop-shadow-[0_8px_0_rgba(0,0,0,0.25)]",
+                  pet.imageSrc.includes("/generated/") ? "scale-110" : "",
+                ].join(" ")}
                 priority={false}
               />
             ) : (

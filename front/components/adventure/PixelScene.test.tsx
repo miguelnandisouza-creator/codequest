@@ -6,11 +6,15 @@ import { zeroToBasicsStages } from "@/data/campaigns/sql/stages/curriculum";
 
 describe("PixelScene", () => {
   it("renders stage-specific scene text before and after solving", () => {
-    const tableStage = zeroToBasicsStages[1];
+    const tableStage = zeroToBasicsStages.find((stage) => (
+      stage.id === "sql-village-02-tables"
+    ));
+
+    expect(tableStage).toBeDefined();
 
     const { rerender } = render(
       <PixelScene
-        stage={tableStage}
+        stage={tableStage!}
         resolved={false}
       />
     );
@@ -21,7 +25,7 @@ describe("PixelScene", () => {
 
     rerender(
       <PixelScene
-        stage={tableStage}
+        stage={tableStage!}
         resolved
       />
     );

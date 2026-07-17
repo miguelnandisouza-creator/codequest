@@ -31,6 +31,7 @@ const rewardLabels: Record<RewardKind, string> = {
 export default function RewardsPage() {
   const { player, buyReward, equipReward } = usePlayer();
   const [activeTab, setActiveTab] = useState<RewardKind>("avatar");
+  const rewardsLocked = Boolean(player.inventory.rewardsLocked);
   const sessionSnapshot = useSyncExternalStore(
     subscribeToLocalAuth,
     getLocalSessionSnapshot,
@@ -65,10 +66,14 @@ export default function RewardsPage() {
             </p>
           </div>
 
-          <div className="cq-panel p-5">
+          <div className="cq-panel w-full min-w-0 overflow-hidden p-5 md:w-auto md:min-w-64">
             <p className="cq-kicker">Carteira</p>
-            <p className="mt-2 font-mono text-3xl font-black">{player.coins} moedas</p>
-            <p className="mt-1 text-sm text-[#93a4bd]">Nivel {player.level}</p>
+            <p className="mt-2 break-words font-mono text-2xl font-black md:text-3xl">
+              {player.coins} moedas
+            </p>
+            <p className="mt-1 break-words text-sm text-[#93a4bd]">
+              Nivel {player.level}
+            </p>
           </div>
         </div>
 
@@ -85,13 +90,19 @@ export default function RewardsPage() {
           ))}
         </div>
 
+        {rewardsLocked && (
+          <div className="cq-panel mt-6 border-yellow-300/40 p-4 text-sm text-yellow-100">
+            Loja bloqueada pelo admin. Voce pode ver os itens, mas nao comprar ou trocar equipamentos agora.
+          </div>
+        )}
+
         <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {visibleRewards.map((reward) => {
             const owned = player.inventory.ownedRewardIds.includes(reward.id);
             const equipped = getEquippedRewardId(player.inventory, reward.kind) === reward.id;
             const locked = player.level < reward.levelRequired;
             const lacksCoins = player.coins < reward.price;
-            const cannotBuy = locked || lacksCoins;
+            const cannotBuy = rewardsLocked || locked || lacksCoins;
 
             return (
               <article key={reward.id} className="cq-card p-5">
@@ -108,7 +119,10 @@ export default function RewardsPage() {
                         alt={reward.name}
                         fill
                         sizes={reward.kind === "avatar" ? "96px" : "112px"}
-                        className={reward.kind === "avatar" ? "object-cover" : "object-contain p-2"}
+                        className={[
+                          reward.kind === "avatar" ? "object-cover" : "object-contain",
+                          reward.imageSrc.includes("/generated/") ? "p-0" : "p-2",
+                        ].join(" ")}
                       />
                     </div>
                   ) : reward.swatch ? (
@@ -130,6 +144,11 @@ export default function RewardsPage() {
                   <span className="cq-badge">
                     {rewardLabels[reward.kind]}
                   </span>
+                  {reward.rarity === "lendario" && (
+                    <span className="cq-badge border-[#e7c66a]/60 text-[#ffe6a3]">
+                      Lendario
+                    </span>
+                  )}
                 </div>
 
                 <h2 className="cq-title mt-6 text-2xl">{reward.name}</h2>
@@ -140,6 +159,13 @@ export default function RewardsPage() {
                 <div className="mt-5 flex flex-wrap gap-2">
                   <span className="cq-badge">{reward.price} moedas</span>
                   <span className="cq-badge">Nivel {reward.levelRequired}</span>
+                  {reward.petAbility && (
+                    getPetAbilityBadges(reward.petAbility).map((label) => (
+                      <span key={label} className="cq-badge border-[#72e6a8]/45 text-[#b8ffd8]">
+                        {label}
+                      </span>
+                    ))
+                  )}
                 </div>
 
                 <div className="mt-6">
@@ -147,9 +173,10 @@ export default function RewardsPage() {
                     <button
                       type="button"
                       onClick={() => equipReward(reward.id, reward.kind)}
-                      className="cq-button w-full"
+                      disabled={rewardsLocked}
+                      className="cq-button w-full disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      {equipped ? "Equipado" : "Equipar"}
+                      {rewardsLocked ? "Bloqueado" : equipped ? "Equipado" : "Equipar"}
                     </button>
                   ) : (
                     <button
@@ -160,7 +187,9 @@ export default function RewardsPage() {
                     >
                       {locked
                         ? "Nivel insuficiente"
-                        : lacksCoins
+                        : rewardsLocked
+                          ? "Bloqueado"
+                          : lacksCoins
                           ? "Moedas insuficientes"
                           : "Comprar"}
                     </button>
@@ -202,4 +231,44 @@ function parseJson<T>(value: string) {
   } catch {
     return null;
   }
+}
+
+function getPetAbilityBadges(ability: {
+  label: string;
+  coinBonusPercent?: number;
+  xpBonusPercent?: number;
+  flatCoinBonus?: number;
+  flatXpBonus?: number;
+  intervalBonusMissions?: number;
+  intervalBonusCoins?: number;
+  intervalBonusXp?: number;
+  hintPenaltyReduction?: number;
+  cooldownMissions?: number;
+}) {
+  const badges = [ability.label];
+
+  if (ability.flatCoinBonus) {
+    badges.push(`+${ability.flatCoinBonus} moedas fixas`);
+  }
+
+  if (ability.flatXpBonus) {
+    badges.push(`+${ability.flatXpBonus} XP fixo`);
+  }
+
+  if (ability.intervalBonusMissions) {
+    const parts = [
+      ability.intervalBonusXp ? `+${ability.intervalBonusXp} XP` : "",
+      ability.intervalBonusCoins ? `+${ability.intervalBonusCoins} moedas` : "",
+    ].filter(Boolean).join(" e ");
+
+    if (parts) {
+      badges.push(`${parts} a cada ${ability.intervalBonusMissions}`);
+    }
+  }
+
+  if (ability.cooldownMissions) {
+    badges.push(`recarga ${ability.cooldownMissions} missao`);
+  }
+
+  return badges;
 }
