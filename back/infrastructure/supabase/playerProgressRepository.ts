@@ -10,6 +10,7 @@ import { getSupabaseServerClient } from "./serverClient";
 
 const dataDir = path.join(process.cwd(), ".data");
 const snapshotsFile = path.join(dataDir, "progress-snapshots.jsonl");
+const canWriteLocalFiles = process.env.VERCEL !== "1";
 
 type PlayerProgressRow = {
   user_id: string;
@@ -40,7 +41,9 @@ export async function readPlayerProgress(userId: string) {
 
   if (error) {
     console.warn("Supabase read player_progress failed:", error.message);
-    return readFilePlayerProgress(userId);
+    return canWriteLocalFiles
+      ? readFilePlayerProgress(userId)
+      : mergePlayer({ id: userId });
   }
 
   if (!data) {
@@ -80,9 +83,8 @@ export async function writePlayerProgress(
     await saveProgressSnapshot(userId, existingPlayer, options.forceOverwrite ? "force_overwrite" : "before_write");
   }
 
-  await writeFilePlayerProgress(userId, mergedPlayer);
-
   if (!supabase) {
+    await writeFilePlayerProgress(userId, mergedPlayer);
     return mergedPlayer;
   }
 
@@ -96,6 +98,10 @@ export async function writePlayerProgress(
 
   if (error) {
     console.warn("Supabase write player_progress failed:", error.message);
+
+    if (canWriteLocalFiles) {
+      await writeFilePlayerProgress(userId, mergedPlayer);
+    }
   }
 
   return mergedPlayer;
@@ -185,8 +191,10 @@ async function saveProgressSnapshot(userId: string, player: Player, reason: stri
     console.warn("Supabase insert progress_snapshots failed:", error.message);
   }
 
-  await mkdir(dataDir, { recursive: true });
-  await appendFile(snapshotsFile, `${JSON.stringify(snapshot)}\n`, "utf8");
+  if (canWriteLocalFiles) {
+    await mkdir(dataDir, { recursive: true });
+    await appendFile(snapshotsFile, `${JSON.stringify(snapshot)}\n`, "utf8");
+  }
 }
 
 function shouldSnapshot(existing: Player, next: Player) {
@@ -226,11 +234,15 @@ async function readExistingProgress(userId: string) {
     }
   }
 
-  try {
-    return await readFilePlayerProgress(userId);
-  } catch {
-    return null;
+  if (canWriteLocalFiles) {
+    try {
+      return await readFilePlayerProgress(userId);
+    } catch {
+      return null;
+    }
   }
+
+  return null;
 }
 
 function mergeSafeProgress(existing: Player, incoming: Player) {
