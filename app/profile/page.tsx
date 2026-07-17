@@ -6,6 +6,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { usePlayer } from "@/application/hooks/usePlayer";
 import { campaigns } from "@/data/campaigns";
 import { getSelectedCampaignIds, OnboardingAnswers } from "@/data/onboarding";
+import { rewardItems } from "@/data/rewards";
 import { hasCompletedStage } from "@/domain/game/playerProgress";
 
 function subscribeToOnboardingStorage(callback: () => void) {
@@ -75,6 +76,7 @@ export default function ProfilePage() {
   const completedVisibleStages = visibleStages.filter((stage) => (
     hasCompletedStage(player, stage.id)
   )).length;
+  const gifts = player.giftNotifications ?? [];
 
   return (
     <main className="cq-page">
@@ -101,6 +103,42 @@ export default function ProfilePage() {
           <Stat label="Moedas" value={player.coins} />
           <Stat label="Fases" value={`${completedVisibleStages}/${visibleStages.length}`} />
         </div>
+
+        {gifts.length > 0 && (
+          <div className="cq-panel mt-8 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="cq-kicker">Presentes recebidos</p>
+                <h2 className="cq-title mt-2 text-2xl">Recompensas do admin</h2>
+              </div>
+              <Link href="/rewards" className="cq-button cq-button-secondary">
+                Abrir loja
+              </Link>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {gifts.slice(0, 4).map((gift) => {
+                const reward = rewardItems.find((item) => item.id === gift.rewardId);
+
+                return (
+                  <div key={gift.id} className="rounded border border-[#26384f] bg-[#07101d] p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="cq-badge">{reward ? getRewardKindLabel(reward.kind) : gift.rewardKind}</span>
+                      <span className="cq-badge border-[#e7c66a]/50 text-[#ffe6a3]">Presente</span>
+                    </div>
+                    <h3 className="cq-title mt-3 text-xl">{gift.rewardName}</h3>
+                    <p className="mt-2 text-sm leading-6 text-[#93a4bd]">
+                      {reward?.description ?? "Item liberado diretamente pelo admin."}
+                    </p>
+                    <p className="mt-3 text-xs text-[#6f86a8]">
+                      Recebido em {formatDate(gift.createdAt)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {visibleCampaigns.length === 0 ? (
           <div className="cq-panel mt-10 p-6">
@@ -169,6 +207,22 @@ export default function ProfilePage() {
       </section>
     </main>
   );
+}
+
+function getRewardKindLabel(kind: string) {
+  if (kind === "avatar") return "Foto";
+  if (kind === "pet") return "Pet";
+  if (kind === "theme") return "Tema";
+  if (kind === "frame") return "Moldura";
+  return "Efeito";
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  }).format(new Date(value));
 }
 
 function Stat({

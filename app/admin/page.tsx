@@ -67,6 +67,8 @@ type StageOption = {
   campaignTitle: string;
 };
 
+type AdminUserTab = "progress" | "rewards" | "password" | "exam" | "history";
+
 export default function AdminPage() {
   const sessionSnapshot = useSyncExternalStore(
     subscribeToLocalAuth,
@@ -81,27 +83,37 @@ export default function AdminPage() {
   const [storageMode, setStorageMode] = useState<"local" | "supabase" | "">("");
   const [stageOptions, setStageOptions] = useState<StageOption[]>([]);
   const [filter, setFilter] = useState<"all" | "pending" | "active" | "new" | "advanced">("all");
+  const [search, setSearch] = useState("");
   const isAdmin = isAdminEmail(session?.email);
   const analytics = useMemo(() => getAdminAnalytics(rows), [rows]);
   const filteredRows = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    const searchedRows = normalizedSearch
+      ? rows.filter((row) => (
+        row.user.name.toLowerCase().includes(normalizedSearch) ||
+        row.user.email.toLowerCase().includes(normalizedSearch) ||
+        row.user.id.toLowerCase().includes(normalizedSearch)
+      ))
+      : rows;
+
     if (filter === "pending") {
-      return rows.filter((row) => row.player.surpriseExam && !row.player.surpriseExam.completedAt);
+      return searchedRows.filter((row) => row.player.surpriseExam && !row.player.surpriseExam.completedAt);
     }
 
     if (filter === "active") {
-      return rows.filter((row) => row.player.progress.completedStages.length > 0);
+      return searchedRows.filter((row) => row.player.progress.completedStages.length > 0);
     }
 
     if (filter === "new") {
-      return rows.filter((row) => row.player.progress.completedStages.length === 0);
+      return searchedRows.filter((row) => row.player.progress.completedStages.length === 0);
     }
 
     if (filter === "advanced") {
-      return [...rows].sort((left, right) => right.player.level - left.player.level);
+      return [...searchedRows].sort((left, right) => right.player.level - left.player.level);
     }
 
-    return rows;
-  }, [filter, rows]);
+    return searchedRows;
+  }, [filter, rows, search]);
 
   useEffect(() => {
     setAuthReady(true);
@@ -394,9 +406,26 @@ export default function AdminPage() {
           ))}
         </div>
 
+        <div className="cq-panel mt-6 grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-center">
+          <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#93a4bd]">
+            Buscar aluno
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="min-h-11 border border-[#26384f] bg-[#0b1424] px-3 font-mono text-sm text-[#f3f7ff] outline-none focus:border-[#6f91d8]"
+              placeholder="Nome, email ou ID"
+            />
+          </label>
+          <span className="cq-badge">
+            {filteredRows.length} de {rows.length}
+          </span>
+        </div>
+
         <div className="mt-8 grid gap-4">
           {loading ? (
             <div className="cq-panel p-6 text-[#93a4bd]">Carregando usuarios...</div>
+          ) : filteredRows.length === 0 ? (
+            <div className="cq-panel p-6 text-[#93a4bd]">Nenhum usuario encontrado.</div>
           ) : filteredRows.map((row) => (
             <AdminUserCard
               key={[
@@ -472,6 +501,7 @@ function AdminUserCard({
   stageOptions: StageOption[];
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<AdminUserTab>("progress");
   const [name, setName] = useState(row.user.name);
   const [coins, setCoins] = useState(String(row.player.coins));
   const [level, setLevel] = useState(String(row.player.level));
@@ -529,8 +559,29 @@ function AdminUserCard({
       </div>
 
       {expanded && (
-        <div className="mt-6 grid gap-3 border-t border-[#26384f] pt-5 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
-          <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#93a4bd] sm:col-span-2">
+        <div className="mt-6 border-t border-[#26384f] pt-5">
+          <div className="mb-5 flex flex-wrap gap-2">
+            {[
+              ["progress", "Progresso"],
+              ["rewards", "Recompensas"],
+              ["password", "Senha"],
+              ["exam", "Prova"],
+              ["history", "Historico"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setActiveTab(value as AdminUserTab)}
+                className={`cq-button ${activeTab === value ? "" : "cq-button-secondary"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "progress" && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
+            <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#93a4bd] sm:col-span-2">
             Nome
             <input
               value={name}
@@ -568,7 +619,11 @@ function AdminUserCard({
           >
             Salvar nome/nivel/moedas
           </button>
+          </div>
+          )}
 
+          {activeTab === "password" && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
           <div className="cq-panel p-4 sm:col-span-2">
             <p className="cq-kicker">Senha</p>
             <p className="mt-2 text-sm text-[#93a4bd]">
@@ -599,7 +654,11 @@ function AdminUserCard({
               </button>
             </div>
           </div>
+          </div>
+          )}
 
+          {activeTab === "progress" && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
           <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#93a4bd] sm:col-span-2">
             Fase atual
             <select
@@ -653,7 +712,11 @@ function AdminUserCard({
               ? "Desbloquear loja do usuario"
               : "Bloquear loja do usuario"}
           </button>
+          </div>
+          )}
 
+          {activeTab === "rewards" && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
           <div className="cq-panel p-4 sm:col-span-2">
             <p className="cq-kicker">Itens do usuario</p>
             <div className="mt-4 grid gap-3 text-sm text-[#c8d3e3]">
@@ -726,7 +789,11 @@ function AdminUserCard({
           >
             Equipar
           </button>
+          </div>
+          )}
 
+          {activeTab === "exam" && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
           <div className="cq-panel p-4 sm:col-span-2">
             <p className="cq-kicker">Prova surpresa</p>
             {row.player.surpriseExam && !row.player.surpriseExam.completedAt && (
@@ -803,7 +870,11 @@ function AdminUserCard({
               </button>
             </div>
           </div>
+          </div>
+          )}
 
+          {activeTab === "history" && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
           <div className="cq-panel p-4 sm:col-span-2">
             <p className="cq-kicker">Historico recente</p>
             <div className="mt-4 space-y-3">
@@ -882,7 +953,11 @@ function AdminUserCard({
               </div>
             )}
           </div>
+          </div>
+          )}
 
+          {activeTab === "progress" && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
           <div className="cq-panel p-4 sm:col-span-2">
             <p className="cq-kicker">Reset</p>
             <p className="mt-2 text-sm leading-6 text-[#93a4bd]">
@@ -915,6 +990,8 @@ function AdminUserCard({
               </button>
             </div>
           </div>
+          </div>
+          )}
         </div>
       )}
     </article>

@@ -188,9 +188,23 @@ export async function PATCH(request: Request) {
       ? nextPlayer.inventory.ownedRewardIds
       : [...nextPlayer.inventory.ownedRewardIds, reward.id];
     const shouldEquipReward = action === "equipReward" || action === "giftReward";
+    const giftNotifications = action === "giftReward"
+      ? [
+        {
+          id: crypto.randomUUID(),
+          rewardId: reward.id,
+          rewardName: reward.name,
+          rewardKind: reward.kind,
+          giftedBy: "Admin",
+          createdAt: new Date().toISOString(),
+        },
+        ...(nextPlayer.giftNotifications ?? []).slice(0, 9),
+      ]
+      : nextPlayer.giftNotifications;
 
     nextPlayer = {
       ...nextPlayer,
+      giftNotifications,
       avatar: reward.kind === "avatar" && shouldEquipReward
         ? reward.id
         : nextPlayer.avatar,

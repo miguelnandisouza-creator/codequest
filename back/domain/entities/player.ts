@@ -32,6 +32,16 @@ export type Player = {
     rewardsLocked?: boolean;
   };
 
+  giftNotifications?: {
+    id: string;
+    rewardId: string;
+    rewardName: string;
+    rewardKind: string;
+    giftedBy: string;
+    createdAt: string;
+    seenAt?: string;
+  }[];
+
   surpriseExam?: {
     id: string;
     title: string;

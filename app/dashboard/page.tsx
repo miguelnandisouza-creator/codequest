@@ -11,6 +11,7 @@ import {
   OnboardingAnswers,
   planDetails,
 } from "@/data/onboarding";
+import { rewardItems } from "@/data/rewards";
 import { hasCompletedStage } from "@/domain/game/playerProgress";
 
 const cardAccents: Record<string, string> = {
@@ -78,6 +79,10 @@ export default function DashboardPage() {
   const plan = onboarding?.deadline
     ? planDetails[onboarding.deadline]
     : undefined;
+  const latestGift = player.giftNotifications?.[0];
+  const latestGiftReward = latestGift
+    ? rewardItems.find((reward) => reward.id === latestGift.rewardId)
+    : undefined;
 
   return (
     <main className="cq-page">
@@ -120,6 +125,26 @@ export default function DashboardPage() {
             <p className="mt-2 max-w-4xl leading-7 text-[#c8d3e3]">
               {plan.description}
             </p>
+          </div>
+        )}
+
+        {latestGift && (
+          <div className="cq-panel mt-8 border-[#e7c66a]/45 p-5">
+            <p className="cq-kicker">Presente recebido</p>
+            <h2 className="cq-title mt-2 text-2xl">
+              {latestGift.rewardName}
+            </h2>
+            <p className="mt-2 leading-7 text-[#c8d3e3]">
+              {latestGiftReward?.description ?? "Um item novo foi liberado pelo admin."}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href="/rewards" className="cq-button">
+                Ver recompensa
+              </Link>
+              <Link href="/profile" className="cq-button cq-button-secondary">
+                Ver presentes
+              </Link>
+            </div>
           </div>
         )}
 

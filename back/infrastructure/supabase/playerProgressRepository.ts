@@ -256,6 +256,7 @@ function mergeSafeProgress(existing: Player, incoming: Player) {
     ...existing.inventory.ownedRewardIds,
     ...incoming.inventory.ownedRewardIds,
   ]));
+  const giftNotifications = mergeGiftNotifications(existing, incoming);
 
   if (
     Number.isFinite(existingTime) &&
@@ -268,6 +269,7 @@ function mergeSafeProgress(existing: Player, incoming: Player) {
         ...existing.inventory,
         ownedRewardIds,
       },
+      giftNotifications,
       updatedAt: existing.updatedAt,
     });
   }
@@ -291,9 +293,25 @@ function mergeSafeProgress(existing: Player, incoming: Player) {
       ...incoming.inventory,
       ownedRewardIds,
     },
+    giftNotifications,
     surpriseExam: incoming.surpriseExam ?? existing.surpriseExam,
     updatedAt: incoming.updatedAt ?? existing.updatedAt,
   });
+}
+
+function mergeGiftNotifications(existing: Player, incoming: Player) {
+  const byId = new Map<string, NonNullable<Player["giftNotifications"]>[number]>();
+
+  for (const notification of [
+    ...(existing.giftNotifications ?? []),
+    ...(incoming.giftNotifications ?? []),
+  ]) {
+    byId.set(notification.id, notification);
+  }
+
+  return [...byId.values()]
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+    .slice(0, 10);
 }
 
 function getProgressScore(player: Player) {

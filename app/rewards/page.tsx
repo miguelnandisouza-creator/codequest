@@ -31,6 +31,7 @@ const rewardLabels: Record<RewardKind, string> = {
 export default function RewardsPage() {
   const { player, buyReward, equipReward } = usePlayer();
   const [activeTab, setActiveTab] = useState<RewardKind>("avatar");
+  const [rewardFilter, setRewardFilter] = useState<"all" | "owned" | "available" | "exclusive" | "legendary">("all");
   const rewardsLocked = Boolean(player.inventory.rewardsLocked);
   const sessionSnapshot = useSyncExternalStore(
     subscribeToLocalAuth,
@@ -50,6 +51,27 @@ export default function RewardsPage() {
     return session
       ? reward.allowedEmails.includes(session.email.toLowerCase())
       : false;
+  }).filter((reward) => {
+    const owned = player.inventory.ownedRewardIds.includes(reward.id);
+    const available = player.level >= reward.levelRequired && player.coins >= reward.price;
+
+    if (rewardFilter === "owned") {
+      return owned;
+    }
+
+    if (rewardFilter === "available") {
+      return !owned && available;
+    }
+
+    if (rewardFilter === "exclusive") {
+      return Boolean(reward.allowedEmails?.length);
+    }
+
+    if (rewardFilter === "legendary") {
+      return reward.rarity === "lendario";
+    }
+
+    return true;
   });
 
   return (
@@ -86,6 +108,25 @@ export default function RewardsPage() {
               className={`cq-button ${activeTab === tab.value ? "" : "cq-button-secondary"}`}
             >
               {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            ["all", "Todos"],
+            ["owned", "Meus itens"],
+            ["available", "Da para comprar"],
+            ["exclusive", "Exclusivos"],
+            ["legendary", "Lendarios"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setRewardFilter(value as typeof rewardFilter)}
+              className={`cq-button ${rewardFilter === value ? "" : "cq-button-secondary"}`}
+            >
+              {label}
             </button>
           ))}
         </div>
@@ -144,11 +185,9 @@ export default function RewardsPage() {
                   <span className="cq-badge">
                     {rewardLabels[reward.kind]}
                   </span>
-                  {reward.rarity === "lendario" && (
-                    <span className="cq-badge border-[#e7c66a]/60 text-[#ffe6a3]">
-                      Lendario
-                    </span>
-                  )}
+                  <span className={`cq-badge ${getRewardTierClass(reward)}`}>
+                    {getRewardTierLabel(reward)}
+                  </span>
                 </div>
 
                 <h2 className="cq-title mt-6 text-2xl">{reward.name}</h2>
@@ -159,6 +198,9 @@ export default function RewardsPage() {
                 <div className="mt-5 flex flex-wrap gap-2">
                   <span className="cq-badge">{reward.price} moedas</span>
                   <span className="cq-badge">Nivel {reward.levelRequired}</span>
+                  {owned && (
+                    <span className="cq-badge border-[#72e6a8]/45 text-[#b8ffd8]">Seu item</span>
+                  )}
                   {reward.petAbility && (
                     getPetAbilityBadges(reward.petAbility).map((label) => (
                       <span key={label} className="cq-badge border-[#72e6a8]/45 text-[#b8ffd8]">
@@ -199,9 +241,48 @@ export default function RewardsPage() {
             );
           })}
         </div>
+        {visibleRewards.length === 0 && (
+          <div className="cq-panel mt-8 p-6 text-[#93a4bd]">
+            Nenhuma recompensa encontrada neste filtro.
+          </div>
+        )}
       </section>
     </main>
   );
+}
+
+function getRewardTierLabel(reward: { rarity?: string; allowedEmails?: string[]; price: number; levelRequired: number }) {
+  if (reward.allowedEmails?.length) {
+    return "Exclusivo";
+  }
+
+  if (reward.rarity === "lendario") {
+    return "Lendario";
+  }
+
+  if (reward.price >= 500 || reward.levelRequired >= 6) {
+    return "Raro";
+  }
+
+  return "Comum";
+}
+
+function getRewardTierClass(reward: { rarity?: string; allowedEmails?: string[]; price: number; levelRequired: number }) {
+  const tier = getRewardTierLabel(reward);
+
+  if (tier === "Exclusivo") {
+    return "border-[#e7c66a]/60 text-[#ffe6a3]";
+  }
+
+  if (tier === "Lendario") {
+    return "border-[#f472b6]/60 text-[#ffd1e8]";
+  }
+
+  if (tier === "Raro") {
+    return "border-[#72e6a8]/45 text-[#b8ffd8]";
+  }
+
+  return "";
 }
 
 function getEquippedRewardId(
