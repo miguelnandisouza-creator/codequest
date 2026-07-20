@@ -306,7 +306,13 @@ function mergeGiftNotifications(existing: Player, incoming: Player) {
     ...(existing.giftNotifications ?? []),
     ...(incoming.giftNotifications ?? []),
   ]) {
-    byId.set(notification.id, notification);
+    const previous = byId.get(notification.id);
+
+    byId.set(notification.id, {
+      ...previous,
+      ...notification,
+      seenAt: notification.seenAt ?? previous?.seenAt,
+    });
   }
 
   return [...byId.values()]

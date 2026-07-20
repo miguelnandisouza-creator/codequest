@@ -366,6 +366,26 @@ export function usePlayer() {
         };
       });
     },
+    dismissGiftNotification(giftId: string) {
+      updatePlayer((current) => {
+        const giftNotifications = current.giftNotifications ?? [];
+
+        if (!giftNotifications.some((gift) => gift.id === giftId && !gift.seenAt)) {
+          return current;
+        }
+
+        const seenAt = new Date().toISOString();
+
+        return {
+          ...current,
+          giftNotifications: giftNotifications.map((gift) => (
+            gift.id === giftId
+              ? { ...gift, seenAt }
+              : gift
+          )),
+        };
+      });
+    },
     buyReward(rewardId: string) {
       updatePlayer((current) => {
         if (current.inventory.rewardsLocked) {

@@ -7,10 +7,13 @@ import { usePlayer } from "@/application/hooks/usePlayer";
 const seenGiftsKey = "codequest-seen-gifts";
 
 export default function GiftNotificationHub() {
-  const { player, petSay } = usePlayer();
+  const { player, dismissGiftNotification, petSay } = usePlayer();
   const [dismissedIds, setDismissedIds] = useState<string[]>(readSeenGifts);
   const activeGift = useMemo(() => (
-    (player.giftNotifications ?? []).find((gift) => !dismissedIds.includes(gift.id)) ?? null
+    (player.giftNotifications ?? []).find((gift) => (
+      !gift.seenAt &&
+      !dismissedIds.includes(gift.id)
+    )) ?? null
   ), [dismissedIds, player.giftNotifications]);
 
   useEffect(() => {
@@ -32,6 +35,7 @@ export default function GiftNotificationHub() {
 
     setDismissedIds(nextIds);
     writeSeenGifts(nextIds);
+    dismissGiftNotification(activeGift.id);
   }
 
   return (
