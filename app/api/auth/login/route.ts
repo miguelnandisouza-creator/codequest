@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const user = await findStoredUserByCredentials(email, password);
 
   if (!user) {
-    return authError("Email ou senha invalidos.");
+    return authError(request, "Email ou senha invalidos.");
   }
 
   const sessionData = {
@@ -61,13 +61,9 @@ function toClientUser(user: {
   };
 }
 
-function authError(message: string) {
-  return new Response(
-    `<!doctype html><meta charset="utf-8"><script>alert(${JSON.stringify(message)});history.back();</script>`,
-    {
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-      },
-    }
-  );
+function authError(request: Request, message: string) {
+  const url = new URL("/login", request.url);
+  url.searchParams.set("error", message);
+
+  return Response.redirect(url, 303);
 }

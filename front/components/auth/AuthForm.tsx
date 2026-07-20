@@ -5,9 +5,10 @@ import { useState } from "react";
 
 type Props = {
   mode: "login" | "register";
+  errorMessage?: string;
 };
 
-export default function AuthForm({ mode }: Props) {
+export default function AuthForm({ mode, errorMessage }: Props) {
   const isRegister = mode === "register";
 
   return (
@@ -48,6 +49,12 @@ export default function AuthForm({ mode }: Props) {
             : "Continue sua campanha com o progresso salvo na sua conta."}
         </p>
       </div>
+
+      {errorMessage && (
+        <div className="mt-6 rounded-md border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-100">
+          {errorMessage}
+        </div>
+      )}
 
       <form
         action={isRegister ? "/api/auth/register" : "/api/auth/login"}

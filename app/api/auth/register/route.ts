@@ -9,15 +9,15 @@ export async function POST(request: Request) {
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
   if (name.length < 2) {
-    return authError("Digite um nome com pelo menos 2 letras.");
+    return authError(request, "Digite um nome com pelo menos 2 letras.");
   }
 
   if (password.length < 6) {
-    return authError("A senha precisa ter pelo menos 6 caracteres.");
+    return authError(request, "A senha precisa ter pelo menos 6 caracteres.");
   }
 
   if (password !== confirmPassword) {
-    return authError("As senhas nao conferem.");
+    return authError(request, "As senhas nao conferem.");
   }
 
   let user;
@@ -29,21 +29,17 @@ export async function POST(request: Request) {
       password,
     });
   } catch (error) {
-    return authError(error instanceof Error ? error.message : "Nao foi possivel criar a conta.");
+    return authError(request, error instanceof Error ? error.message : "Nao foi possivel criar a conta.");
   }
 
   return authSuccess(user);
 }
 
-function authError(message: string) {
-  return new Response(
-    `<!doctype html><meta charset="utf-8"><script>alert(${JSON.stringify(message)});history.back();</script>`,
-    {
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-      },
-    }
-  );
+function authError(request: Request, message: string) {
+  const url = new URL("/register", request.url);
+  url.searchParams.set("error", message);
+
+  return Response.redirect(url, 303);
 }
 
 function authSuccess(user: {
