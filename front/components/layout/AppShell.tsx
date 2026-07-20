@@ -55,7 +55,7 @@ export default function AppShell({ children, maintenanceMode = false }: Props) {
       ) : (
         <>
       <header className="sticky top-0 z-50 border-b border-[#22324a] bg-[#070c15]/92 backdrop-blur">
-        <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3 text-white md:px-6">
+        <nav className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 text-white md:flex-row md:items-center md:justify-between md:px-6">
           <Link
             href="/dashboard"
             className="flex items-center gap-3 font-mono text-sm font-black uppercase tracking-[0.12em] text-[#f3f7ff]"
@@ -64,7 +64,7 @@ export default function AppShell({ children, maintenanceMode = false }: Props) {
             CodeQuest
           </Link>
 
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[#93a4bd] md:gap-4">
+          <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 text-xs font-bold uppercase tracking-[0.08em] text-[#93a4bd] md:w-auto md:overflow-visible md:pb-0 md:gap-4">
             <Link href="/dashboard" className="rounded px-2 py-1 hover:bg-white/5 hover:text-white">
               Campanhas
             </Link>

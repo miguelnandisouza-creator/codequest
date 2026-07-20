@@ -1,4 +1,5 @@
 import { rewardItems } from "@/data/rewards";
+import { campaigns } from "@/data/campaigns";
 import { readStoredUsers } from "@/infrastructure/auth/userStore";
 import { readPlayerProgress } from "@/infrastructure/supabase/playerProgressRepository";
 
@@ -25,7 +26,9 @@ export async function GET() {
       level: player.level,
       xp: player.xp,
       coins: player.coins,
+      streak: player.streak,
       completedStages: player.progress.completedStages.length,
+      currentCourse: getCurrentCourseTitle(player.progress.campaignId),
       avatarSrc: avatar?.imageSrc ?? null,
       avatarName: avatar?.name ?? "Perfil",
     };
@@ -40,4 +43,8 @@ export async function GET() {
   ));
 
   return Response.json({ ranking });
+}
+
+function getCurrentCourseTitle(campaignId?: string) {
+  return campaigns.find((campaign) => campaign.id === campaignId)?.title ?? "Sem curso";
 }

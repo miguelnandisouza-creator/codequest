@@ -16,7 +16,9 @@ type RankingRow = {
   level: number;
   xp: number;
   coins: number;
+  streak: number;
   completedStages: number;
+  currentCourse: string;
   avatarSrc?: string | null;
   avatarName: string;
 };
@@ -138,19 +140,20 @@ export default function RankingPage() {
         </div>
 
         <div className="cq-panel mt-8 overflow-hidden p-0">
-          <div className="grid grid-cols-[4rem_1fr_5rem_5rem] border-b border-[#26384f] px-4 py-3 font-mono text-xs font-black uppercase tracking-[0.1em] text-[#93a4bd] md:grid-cols-[4rem_1fr_6rem_6rem_6rem]">
+          <div className="grid grid-cols-[3rem_1fr_4.5rem] border-b border-[#26384f] px-3 py-3 font-mono text-xs font-black uppercase tracking-[0.1em] text-[#93a4bd] md:grid-cols-[4rem_1fr_6rem_6rem_6rem_6rem] md:px-4">
             <span>#</span>
             <span>Usuario</span>
             <span>Level</span>
-            <span>XP</span>
+            <span className="hidden md:block">XP</span>
             <span className="hidden md:block">Fases</span>
+            <span className="hidden md:block">Sequencia</span>
           </div>
 
           {ranking.map((row, index) => (
             <div
               key={row.userId}
               className={[
-                "grid grid-cols-[4rem_1fr_5rem_5rem] items-center border-b border-[#172336] px-4 py-4 last:border-b-0 md:grid-cols-[4rem_1fr_6rem_6rem_6rem]",
+                "grid grid-cols-[3rem_1fr_4.5rem] items-center border-b border-[#172336] px-3 py-4 last:border-b-0 md:grid-cols-[4rem_1fr_6rem_6rem_6rem_6rem] md:px-4",
                 session?.userId === row.userId ? "bg-[#2f66e8]/10" : "",
               ].join(" ")}
             >
@@ -164,14 +167,17 @@ export default function RankingPage() {
                     {row.name}
                   </p>
                   <p className="mt-1 text-xs text-[#93a4bd]">
-                    {row.coins} moedas
+                    {row.currentCourse} / {row.coins} moedas
                   </p>
                 </div>
               </div>
               <span className="font-mono text-sm text-[#dbe8ff]">{row.level}</span>
-              <span className="font-mono text-sm text-[#dbe8ff]">{row.xp}</span>
+              <span className="hidden font-mono text-sm text-[#dbe8ff] md:block">{row.xp}</span>
               <span className="hidden font-mono text-sm text-[#dbe8ff] md:block">
                 {row.completedStages}
+              </span>
+              <span className="hidden font-mono text-sm text-[#dbe8ff] md:block">
+                {row.streak}
               </span>
             </div>
           ))}

@@ -7,7 +7,9 @@ import { usePlayer } from "@/application/hooks/usePlayer";
 import { campaigns } from "@/data/campaigns";
 import { getSelectedCampaignIds, OnboardingAnswers } from "@/data/onboarding";
 import { rewardItems } from "@/data/rewards";
+import { Player } from "@/domain/entities/player";
 import { hasCompletedStage } from "@/domain/game/playerProgress";
+import ProfileAvatar from "@/components/rewards/ProfileAvatar";
 
 function subscribeToOnboardingStorage(callback: () => void) {
   window.addEventListener("storage", callback);
@@ -77,6 +79,10 @@ export default function ProfilePage() {
     hasCompletedStage(player, stage.id)
   )).length;
   const gifts = player.giftNotifications ?? [];
+  const equippedRewards = getEquippedRewards(player);
+  const completionPercent = visibleStages.length === 0
+    ? 0
+    : Math.round((completedVisibleStages / visibleStages.length) * 100);
 
   return (
     <main className="cq-page">
@@ -103,6 +109,31 @@ export default function ProfilePage() {
           <Stat label="Moedas" value={player.coins} />
           <Stat label="Fases" value={`${completedVisibleStages}/${visibleStages.length}`} />
         </div>
+
+        <section className="cq-panel mt-8 p-5">
+          <div className="grid gap-5 md:grid-cols-[auto_1fr_auto] md:items-center">
+            <ProfileAvatar size="lg" />
+            <div>
+              <p className="cq-kicker">Identidade do jogador</p>
+              <h2 className="cq-title mt-2 text-2xl">{player.name || "Aventureiro CodeQuest"}</h2>
+              <p className="mt-2 leading-7 text-[#93a4bd]">
+                {completionPercent}% do caminho visivel concluido, {player.streak} de sequencia e {player.achievements.length} conquistas.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {equippedRewards.length === 0 ? (
+                  <span className="text-sm text-[#6f86a8]">Nenhum item equipado ainda.</span>
+                ) : equippedRewards.map((reward) => (
+                  <span key={reward.id} className="cq-badge">
+                    {getRewardKindLabel(reward.kind)}: {reward.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <Link href="/rewards" className="cq-button cq-button-secondary">
+              Editar visual
+            </Link>
+          </div>
+        </section>
 
         {gifts.length > 0 && (
           <div className="cq-panel mt-8 p-5">
@@ -215,6 +246,18 @@ function getRewardKindLabel(kind: string) {
   if (kind === "theme") return "Tema";
   if (kind === "frame") return "Moldura";
   return "Efeito";
+}
+
+function getEquippedRewards(player: Player) {
+  const equippedIds = [
+    player.inventory.equippedAvatarId ?? player.avatar,
+    player.inventory.equippedPetId,
+    player.inventory.equippedThemeId,
+    player.inventory.equippedFrameId,
+    player.inventory.equippedEffectId,
+  ].filter(Boolean);
+
+  return rewardItems.filter((reward) => equippedIds.includes(reward.id));
 }
 
 function formatDate(value: string) {
