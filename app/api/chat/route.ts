@@ -1,5 +1,8 @@
 import { isAdminEmail } from "@/data/admin";
-import { isSessionUserRequest } from "@/infrastructure/auth/sessionToken";
+import {
+  getSessionRequestPayload,
+  isSessionUserRequest,
+} from "@/infrastructure/auth/sessionToken";
 import {
   ChatRoomType,
   createChatMessage,
@@ -89,10 +92,12 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "Sessao invalida." }, { status: 401 });
   }
 
+  const session = getSessionRequestPayload(request);
+
   await deleteChatMessage({
     messageId: body.messageId,
     userId: body.userId,
-    isAdmin: isAdminEmail(body.email),
+    isAdmin: isAdminEmail(session?.email),
   });
 
   return Response.json({ ok: true });
