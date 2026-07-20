@@ -1,6 +1,6 @@
 "use client";
 
-import { getLocalSession } from "@/application/auth/localAuth";
+import { getLocalSession, getSessionRequestHeaders } from "@/application/auth/localAuth";
 
 type AttemptInput = {
   stageId: string;
@@ -20,9 +20,9 @@ export function recordAttempt(input: AttemptInput) {
   void fetch("/api/attempts", {
     method: "POST",
     keepalive: true,
-    headers: {
+    headers: getSessionRequestHeaders({
       "content-type": "application/json",
-    },
+    }),
     body: JSON.stringify({
       userId: session.userId,
       ...input,

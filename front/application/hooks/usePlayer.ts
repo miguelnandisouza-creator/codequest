@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 
 import {
   getLocalSession,
+  getSessionRequestHeaders,
   subscribeToLocalAuth,
 } from "@/application/auth/localAuth";
 import { PetAbility, rewardItems, RewardKind } from "@/data/rewards";
@@ -125,6 +126,7 @@ async function syncPlayerFromServer() {
   try {
     const response = await fetch(`/api/player?userId=${encodeURIComponent(session.userId)}`, {
       cache: "no-store",
+      headers: getSessionRequestHeaders(),
     });
 
     if (!response.ok) {
@@ -178,9 +180,9 @@ async function savePlayerToServer(player: Player) {
     await fetch("/api/player", {
       method: "POST",
       keepalive: true,
-      headers: {
+      headers: getSessionRequestHeaders({
         "content-type": "application/json",
-      },
+      }),
       body: JSON.stringify({
         userId: session.userId,
         player,

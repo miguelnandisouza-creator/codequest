@@ -5,6 +5,7 @@ import { getSupabaseServerClient } from "./serverClient";
 
 const dataDir = path.join(process.cwd(), ".data");
 const notesFile = path.join(dataDir, "student-notes.json");
+const canWriteLocalFiles = process.env.VERCEL !== "1";
 
 export type StudentNote = {
   userId: string;
@@ -70,12 +71,15 @@ export async function writeStudentNote(userId: string, stageId: string, content:
     console.warn("Supabase write student_notes failed:", error.message);
   }
 
+  if (!canWriteLocalFiles) {
+    throw new Error("Banco de anotacoes indisponivel em producao.");
+  }
+
   const notes = await readLocalNotes();
   const filteredNotes = notes.filter((item) => !(item.userId === userId && item.stageId === stageId));
 
   await mkdir(dataDir, { recursive: true });
   await writeFile(notesFile, JSON.stringify([...filteredNotes, note], null, 2), "utf8");
-
   return note;
 }
 

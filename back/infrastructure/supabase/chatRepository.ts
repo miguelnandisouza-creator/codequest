@@ -22,6 +22,7 @@ export type ChatMessage = {
 
 const dataDir = path.join(process.cwd(), ".data");
 const chatFile = path.join(dataDir, "chat-messages.jsonl");
+const canWriteLocalFiles = process.env.VERCEL !== "1";
 
 export async function readChatUsers(currentUserId: string) {
   const users = await readStoredUsers();
@@ -242,9 +243,12 @@ export async function createChatMessage({
     console.warn("Supabase insert chat_messages failed:", error?.message);
   }
 
+  if (!canWriteLocalFiles) {
+    throw new Error("Banco do chat indisponivel em producao.");
+  }
+
   await mkdir(dataDir, { recursive: true });
   await appendFile(chatFile, `${JSON.stringify(message)}\n`, "utf8");
-
   return message;
 }
 
@@ -277,6 +281,10 @@ export async function deleteChatMessage({
     }
 
     console.warn("Supabase delete chat_messages failed:", error.message);
+  }
+
+  if (!canWriteLocalFiles) {
+    throw new Error("Banco do chat indisponivel em producao.");
   }
 
   const messages = await readLocalChatMessages();

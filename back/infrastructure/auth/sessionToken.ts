@@ -10,7 +10,7 @@ type SessionPayload = {
 };
 
 const tokenMaxAgeMs = 1000 * 60 * 60 * 24 * 90;
-const tokenHeaderName = "x-codequest-session-token";
+export const tokenHeaderName = "x-codequest-session-token";
 
 export function createSessionToken(payload: SessionPayload) {
   const encodedPayload = encodeBase64Url(JSON.stringify(payload));
@@ -53,8 +53,7 @@ export function verifySessionToken(token?: string | null) {
 }
 
 export function isAdminSessionRequest(request: Request) {
-  const token = request.headers.get(tokenHeaderName);
-  const payload = verifySessionToken(token);
+  const payload = getSessionRequestPayload(request);
 
   if (payload && isAdminEmail(payload.email)) {
     return true;
@@ -67,6 +66,16 @@ export function isAdminSessionRequest(request: Request) {
   const email = new URL(request.url).searchParams.get("adminEmail") ?? "";
 
   return isAdminEmail(email);
+}
+
+export function isSessionUserRequest(request: Request, userId: string) {
+  const payload = getSessionRequestPayload(request);
+
+  return payload?.userId === userId;
+}
+
+export function getSessionRequestPayload(request: Request) {
+  return verifySessionToken(request.headers.get(tokenHeaderName));
 }
 
 function sign(value: string) {

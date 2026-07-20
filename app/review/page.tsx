@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   getLocalSessionSnapshot,
   getServerLocalSessionSnapshot,
+  getSessionRequestHeaders,
   LocalSession,
   subscribeToLocalAuth,
 } from "@/application/auth/localAuth";
@@ -75,7 +76,10 @@ export default function ReviewPage() {
       try {
         const response = await fetch(
           `/api/attempts?userId=${encodeURIComponent(session.userId)}&limit=100`,
-          { cache: "no-store" }
+          {
+            cache: "no-store",
+            headers: getSessionRequestHeaders(),
+          }
         );
         const data = await response.json() as { attempts?: AttemptSummary[]; error?: string };
 

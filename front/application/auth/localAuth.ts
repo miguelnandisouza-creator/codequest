@@ -17,6 +17,7 @@ export type LocalSession = {
 const usersKey = "codequest-users";
 const sessionKey = "codequest-session";
 const authEventName = "codequest-auth-change";
+const tokenHeaderName = "x-codequest-session-token";
 
 export function getLocalUsers() {
   try {
@@ -122,6 +123,19 @@ export function getLocalSessionSnapshot() {
 
 export function getServerLocalSessionSnapshot() {
   return "";
+}
+
+export function getSessionRequestHeaders(headers: Record<string, string> = {}) {
+  const session = getLocalSession();
+
+  if (!session?.sessionToken) {
+    return headers;
+  }
+
+  return {
+    ...headers,
+    [tokenHeaderName]: session.sessionToken,
+  };
 }
 
 function createSession(user: LocalUser): LocalSession {

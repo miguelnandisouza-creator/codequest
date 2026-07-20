@@ -38,14 +38,14 @@ export default function AuthForm({ mode }: Props) {
       </div>
 
       <div className="mt-8">
-        <p className="cq-kicker">{isRegister ? "New hero" : "Session"}</p>
+        <p className="cq-kicker">{isRegister ? "Novo heroi" : "Sessao"}</p>
         <h2 className="cq-title mt-3 text-3xl">
           {isRegister ? "Criar conta" : "Entrar"}
         </h2>
         <p className="mt-3 leading-7 text-[#93a4bd]">
           {isRegister
-            ? "Crie um perfil local para guardar sua jornada no CodeQuest."
-            : "Continue sua campanha com o progresso salvo neste navegador."}
+            ? "Crie uma conta para sincronizar sua jornada no CodeQuest."
+            : "Continue sua campanha com o progresso salvo na sua conta."}
         </p>
       </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 
+import { getSessionRequestHeaders } from "@/application/auth/localAuth";
 import { CodeEditor } from "@/components/editor/CodeEditor";
 import { Stage, StageContent } from "@/domain/entities/stage";
 import {
@@ -59,7 +60,10 @@ export default function LearningNotebook({
       try {
         const response = await fetch(
           `/api/notebook-notes?userId=${encodeURIComponent(userId)}&stageId=${encodeURIComponent(stage.id)}`,
-          { cache: "no-store" }
+          {
+            cache: "no-store",
+            headers: getSessionRequestHeaders(),
+          }
         );
         const data = await response.json() as { note?: { content?: string } | null };
 
@@ -179,9 +183,9 @@ export default function LearningNotebook({
       try {
         const response = await fetch("/api/notebook-notes", {
           method: "POST",
-          headers: {
+          headers: getSessionRequestHeaders({
             "content-type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             userId,
             stageId: stage.id,

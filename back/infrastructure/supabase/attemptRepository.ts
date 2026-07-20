@@ -15,6 +15,7 @@ export type AttemptRecord = {
 
 const dataDir = path.join(process.cwd(), ".data");
 const attemptsFile = path.join(dataDir, "attempts.jsonl");
+const canWriteLocalFiles = process.env.VERCEL !== "1";
 
 export async function recordAttempt(attempt: AttemptRecord) {
   const normalizedAttempt = normalizeAttempt(attempt);
@@ -40,9 +41,12 @@ export async function recordAttempt(attempt: AttemptRecord) {
     console.warn("Supabase insert attempts failed:", error.message);
   }
 
+  if (!canWriteLocalFiles) {
+    throw new Error("Banco de tentativas indisponivel em producao.");
+  }
+
   await mkdir(dataDir, { recursive: true });
   await appendFile(attemptsFile, `${JSON.stringify(normalizedAttempt)}\n`, "utf8");
-
   return normalizedAttempt;
 }
 

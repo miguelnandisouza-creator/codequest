@@ -7,6 +7,7 @@ import { getSupabaseServerClient } from "@/infrastructure/supabase/serverClient"
 
 const dataDir = path.join(process.cwd(), ".data");
 const usersFile = path.join(dataDir, "users.json");
+const canWriteLocalFiles = process.env.VERCEL !== "1";
 
 type StoredUser = LocalUser & {
   passwordHash?: string;
@@ -78,8 +79,7 @@ export async function writeStoredUsers(users: LocalUser[]) {
     console.warn("Supabase write codequest_users failed:", error.message);
   }
 
-  await mkdir(dataDir, { recursive: true });
-  await writeFile(usersFile, JSON.stringify(users, null, 2), "utf8");
+  await writeLocalUsers(users);
 }
 
 export async function findStoredUserByCredentials(email: string, password: string) {
@@ -154,8 +154,7 @@ export async function updateStoredUserName(userId: string, name: string) {
       : user
   ));
 
-  await mkdir(dataDir, { recursive: true });
-  await writeFile(usersFile, JSON.stringify(updatedUsers, null, 2), "utf8");
+  await writeLocalUsers(updatedUsers);
 }
 
 export async function resetStoredUserPassword(userId: string, password: string) {
@@ -194,8 +193,7 @@ export async function resetStoredUserPassword(userId: string, password: string) 
       : user
   ));
 
-  await mkdir(dataDir, { recursive: true });
-  await writeFile(usersFile, JSON.stringify(updatedUsers, null, 2), "utf8");
+  await writeLocalUsers(updatedUsers);
 }
 
 function mapSupabaseUser(row: SupabaseUserRow): StoredUser {
@@ -245,4 +243,13 @@ function verifyPassword(user: StoredUser, password: string) {
 
 function hashPassword(password: string, salt: string) {
   return scryptSync(password, salt, 64).toString("hex");
+}
+
+async function writeLocalUsers(users: StoredUser[]) {
+  if (!canWriteLocalFiles) {
+    throw new Error("Banco de usuarios indisponivel em producao.");
+  }
+
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(usersFile, JSON.stringify(users, null, 2), "utf8");
 }

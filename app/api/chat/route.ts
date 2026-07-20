@@ -1,4 +1,5 @@
 import { isAdminEmail } from "@/data/admin";
+import { isSessionUserRequest } from "@/infrastructure/auth/sessionToken";
 import {
   ChatRoomType,
   createChatMessage,
@@ -10,6 +11,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const chatVideoBucket = "chat-videos";
+const canWriteLocalFiles = process.env.VERCEL !== "1";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -19,6 +21,10 @@ export async function GET(request: Request) {
 
   if (!userId) {
     return Response.json({ error: "Usuario nao informado." }, { status: 400 });
+  }
+
+  if (!isSessionUserRequest(request, userId)) {
+    return Response.json({ error: "Sessao invalida." }, { status: 401 });
   }
 
   const messages = await readChatMessages({
@@ -48,6 +54,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Mensagem invalida." }, { status: 400 });
   }
 
+  if (!isSessionUserRequest(request, body.userId)) {
+    return Response.json({ error: "Sessao invalida." }, { status: 401 });
+  }
+
   try {
     const message = await createChatMessage({
       senderId: body.userId,
@@ -75,6 +85,10 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "Mensagem nao informada." }, { status: 400 });
   }
 
+  if (!isSessionUserRequest(request, body.userId)) {
+    return Response.json({ error: "Sessao invalida." }, { status: 401 });
+  }
+
   await deleteChatMessage({
     messageId: body.messageId,
     userId: body.userId,
@@ -98,6 +112,10 @@ async function createMultipartMessage(request: Request) {
 
   if (!userId || !(video instanceof File)) {
     return Response.json({ error: "Video invalido." }, { status: 400 });
+  }
+
+  if (!isSessionUserRequest(request, userId)) {
+    return Response.json({ error: "Sessao invalida." }, { status: 401 });
   }
 
   if (!video.type.startsWith("video/")) {
@@ -133,6 +151,10 @@ async function saveChatVideo(video: File) {
 
   if (supabaseUpload) {
     return supabaseUpload;
+  }
+
+  if (!canWriteLocalFiles) {
+    throw new Error("Configure o Supabase Storage para enviar videos em producao.");
   }
 
   const uploadsDir = path.join(process.cwd(), "public", "uploads", "chat");

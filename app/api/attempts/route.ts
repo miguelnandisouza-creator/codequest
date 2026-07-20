@@ -2,6 +2,7 @@ import {
   readRecentAttempts,
   recordAttempt,
 } from "@/infrastructure/supabase/attemptRepository";
+import { isSessionUserRequest } from "@/infrastructure/auth/sessionToken";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -10,6 +11,10 @@ export async function GET(request: Request) {
 
   if (!userId) {
     return Response.json({ error: "Usuario nao informado." }, { status: 400 });
+  }
+
+  if (!isSessionUserRequest(request, userId)) {
+    return Response.json({ error: "Sessao invalida." }, { status: 401 });
   }
 
   const attempts = await readRecentAttempts(userId, Number.isFinite(limit) ? limit : 80);
@@ -29,6 +34,10 @@ export async function POST(request: Request) {
 
   if (!body?.userId || !body.stageId || typeof body.success !== "boolean") {
     return Response.json({ error: "Tentativa invalida." }, { status: 400 });
+  }
+
+  if (!isSessionUserRequest(request, body.userId)) {
+    return Response.json({ error: "Sessao invalida." }, { status: 401 });
   }
 
   const attempt = await recordAttempt({

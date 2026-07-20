@@ -3,23 +3,23 @@ import Link from "next/link";
 
 const features = [
   {
-    title: "Quest-Based",
-    subtitle: "Learning",
+    title: "Missoes",
+    subtitle: "guiadas",
     icon: "quest",
   },
   {
-    title: "Bite-Sized",
-    subtitle: "Lessons",
+    title: "Aulas",
+    subtitle: "curtas",
     icon: "book",
   },
   {
-    title: "Track Your",
-    subtitle: "Progress",
+    title: "Progresso",
+    subtitle: "salvo",
     icon: "progress",
   },
   {
-    title: "Earn Rewards &",
-    subtitle: "Level Up",
+    title: "Loja",
+    subtitle: "e ranking",
     icon: "reward",
   },
 ];
@@ -51,13 +51,13 @@ export default function Home() {
                 <span className="absolute left-0 top-[7px] h-0.5 w-4 bg-[#b8cfff]" />
                 <span className="absolute left-[7px] top-[3px] size-1 bg-[#5b8cff]" />
               </span>
-              RPG Learn
+              CodeQuest
             </Link>
 
             <nav className="hidden items-center gap-7 md:flex">
-              <a href="#features" className="hover:text-white">Features</a>
-              <Link href="/dashboard" className="hover:text-white">Modules</Link>
-              <Link href="/profile" className="hover:text-white">About</Link>
+              <a href="#features" className="hover:text-white">Recursos</a>
+              <Link href="/dashboard" className="hover:text-white">Campanhas</Link>
+              <Link href="/profile" className="hover:text-white">Cursos</Link>
               <Link
                 href="/login"
                 className="border border-[#45648d] px-3 py-1.5 text-white hover:border-[#7ea6ff]"
@@ -70,13 +70,13 @@ export default function Home() {
           <div className="flex flex-1 items-center pb-8 pt-8 md:pb-10">
             <div className="max-w-[34rem]">
               <h1 className="font-mono text-[clamp(2.45rem,5.4vw,4.15rem)] font-black uppercase leading-[1.02] tracking-[-0.02em] text-[#f3f7ff]">
-                <span className="whitespace-nowrap">Level Up</span>
+                <span className="whitespace-nowrap">Aprenda codigo</span>
                 <br />
-                <span className="whitespace-nowrap">Your Skills.</span>
+                <span className="whitespace-nowrap">em modo RPG.</span>
               </h1>
 
               <p className="mt-6 max-w-sm font-mono text-xs leading-6 text-[#b7c5da] md:text-sm">
-                An RPG-inspired journey to learn, practice, and master new skills one quest at a time.
+                Uma jornada gamificada para aprender SQL, JavaScript, Python, Java e C# com missoes, chefes, recompensas e progresso salvo.
               </p>
 
               <div className="mt-7 flex flex-wrap gap-3">
@@ -84,7 +84,7 @@ export default function Home() {
                   href="/onboarding"
                   className="inline-flex min-h-11 items-center gap-3 rounded border border-[#7ea6ff] bg-[#4a78dc] px-5 font-mono text-sm font-bold text-white hover:bg-[#5b8cff]"
                 >
-                  Begin Journey
+                  Comecar jornada
                   <span>{">"}</span>
                 </Link>
 
@@ -92,7 +92,7 @@ export default function Home() {
                   href="/dashboard"
                   className="inline-flex min-h-11 items-center rounded border border-[#304662] bg-[#0b1424]/80 px-5 font-mono text-sm font-bold text-[#d7e4f8] hover:border-[#5b8cff] hover:text-white"
                 >
-                  How It Works
+                  Ver campanhas
                 </Link>
               </div>
             </div>

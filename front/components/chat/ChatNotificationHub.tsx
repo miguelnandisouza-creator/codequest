@@ -7,6 +7,7 @@ import { MutableRefObject, useCallback, useEffect, useMemo, useRef, useState, us
 import {
   getLocalSessionSnapshot,
   getServerLocalSessionSnapshot,
+  getSessionRequestHeaders,
   LocalSession,
   subscribeToLocalAuth,
 } from "@/application/auth/localAuth";
@@ -54,6 +55,7 @@ export default function ChatNotificationHub() {
 
     const response = await fetch(`/api/chat/notifications?${params.toString()}`, {
       cache: "no-store",
+      headers: getSessionRequestHeaders(),
     });
     const data = await response.json() as { messages?: ChatMessage[] };
     const incomingMessages = data.messages ?? [];

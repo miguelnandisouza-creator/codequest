@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncEx
 import {
   getLocalSessionSnapshot,
   getServerLocalSessionSnapshot,
+  getSessionRequestHeaders,
   LocalSession,
   subscribeToLocalAuth,
 } from "@/application/auth/localAuth";
@@ -71,6 +72,7 @@ export default function ChatPage() {
 
     const response = await fetch(`/api/chat/users?userId=${encodeURIComponent(session.userId)}`, {
       cache: "no-store",
+      headers: getSessionRequestHeaders(),
     });
     const data = await response.json() as { users?: ChatUser[] };
     const nextUsers = data.users ?? [];
@@ -95,6 +97,7 @@ export default function ChatPage() {
 
     const response = await fetch(`/api/chat?${params.toString()}`, {
       cache: "no-store",
+      headers: getSessionRequestHeaders(),
     });
     const data = await response.json() as { messages?: ChatMessage[]; error?: string };
 
@@ -134,6 +137,7 @@ export default function ChatPage() {
 
     const response = await fetch(`/api/chat/notifications?${params.toString()}`, {
       cache: "no-store",
+      headers: getSessionRequestHeaders(),
     });
     const data = await response.json() as { messages?: ChatMessage[] };
     const incomingMessages = data.messages ?? [];
@@ -227,9 +231,9 @@ export default function ChatPage() {
       ? await sendVideoMessage(session.userId, roomType, peerId, body, videoFile)
       : await fetch("/api/chat", {
         method: "POST",
-        headers: {
+        headers: getSessionRequestHeaders({
           "content-type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           userId: session.userId,
           roomType,
@@ -287,9 +291,9 @@ export default function ChatPage() {
 
     await fetch("/api/chat", {
       method: "DELETE",
-      headers: {
+      headers: getSessionRequestHeaders({
         "content-type": "application/json",
-      },
+      }),
       body: JSON.stringify({
         userId: session.userId,
         email: session.email,
@@ -587,6 +591,7 @@ function sendVideoMessage(
 
   return fetch("/api/chat", {
     method: "POST",
+    headers: getSessionRequestHeaders(),
     body: formData,
   });
 }

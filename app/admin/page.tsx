@@ -76,7 +76,6 @@ export default function AdminPage() {
     getServerLocalSessionSnapshot
   );
   const session = useMemo(() => parseJson<LocalSession>(sessionSnapshot), [sessionSnapshot]);
-  const [authReady, setAuthReady] = useState(false);
   const [rows, setRows] = useState<AdminRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -114,10 +113,6 @@ export default function AdminPage() {
 
     return searchedRows;
   }, [filter, rows, search]);
-
-  useEffect(() => {
-    setAuthReady(true);
-  }, []);
 
   const loadRows = useCallback(async () => {
     if (!session) {
@@ -257,22 +252,6 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  if (!authReady) {
-    return (
-      <main className="cq-page">
-        <section className="cq-shell">
-          <div className="cq-panel max-w-2xl p-6">
-            <p className="cq-kicker">Admin</p>
-            <h1 className="cq-title mt-3 text-4xl">Verificando sessao</h1>
-            <p className="mt-4 text-[#93a4bd]">
-              Conferindo se este navegador esta logado com a conta admin.
-            </p>
-          </div>
-        </section>
-      </main>
-    );
   }
 
   if (!session) {
