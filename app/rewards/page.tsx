@@ -31,7 +31,7 @@ const rewardLabels: Record<RewardKind, string> = {
 export default function RewardsPage() {
   const { player, buyReward, equipReward } = usePlayer();
   const [activeTab, setActiveTab] = useState<RewardKind>("avatar");
-  const [rewardFilter, setRewardFilter] = useState<"all" | "owned" | "available" | "exclusive" | "legendary">("all");
+  const [rewardFilter, setRewardFilter] = useState<"all" | "owned" | "available" | "gifted" | "exclusive" | "legendary">("all");
   const rewardsLocked = Boolean(player.inventory.rewardsLocked);
   const sessionSnapshot = useSyncExternalStore(
     subscribeToLocalAuth,
@@ -54,6 +54,7 @@ export default function RewardsPage() {
   }).filter((reward) => {
     const owned = player.inventory.ownedRewardIds.includes(reward.id);
     const available = player.level >= reward.levelRequired && player.coins >= reward.price;
+    const gifted = hasGiftNotification(player.giftNotifications, reward.id);
 
     if (rewardFilter === "owned") {
       return owned;
@@ -61,6 +62,10 @@ export default function RewardsPage() {
 
     if (rewardFilter === "available") {
       return !owned && available;
+    }
+
+    if (rewardFilter === "gifted") {
+      return gifted;
     }
 
     if (rewardFilter === "exclusive") {
@@ -73,6 +78,8 @@ export default function RewardsPage() {
 
     return true;
   });
+  const activeTabRewards = rewardItems.filter((reward) => reward.kind === activeTab);
+  const shopStats = getShopStats(activeTabRewards, player, session);
 
   return (
     <main className="cq-page">
@@ -112,11 +119,19 @@ export default function RewardsPage() {
           ))}
         </div>
 
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <ShopStat label="Liberados" value={shopStats.owned} />
+          <ShopStat label="Da para comprar" value={shopStats.available} />
+          <ShopStat label="Recebidos" value={shopStats.gifted} />
+          <ShopStat label="Bloqueados" value={shopStats.locked} />
+        </div>
+
         <div className="mt-4 flex flex-wrap gap-2">
           {[
             ["all", "Todos"],
             ["owned", "Meus itens"],
             ["available", "Da para comprar"],
+            ["gifted", "Recebidos"],
             ["exclusive", "Exclusivos"],
             ["legendary", "Lendarios"],
           ].map(([value, label]) => (
@@ -144,9 +159,25 @@ export default function RewardsPage() {
             const locked = player.level < reward.levelRequired;
             const lacksCoins = player.coins < reward.price;
             const cannotBuy = rewardsLocked || locked || lacksCoins;
+            const gifted = hasGiftNotification(player.giftNotifications, reward.id);
+            const status = getRewardStatus({
+              owned,
+              equipped,
+              gifted,
+              rewardsLocked,
+              locked,
+              lacksCoins,
+            });
 
             return (
-              <article key={reward.id} className="cq-card p-5">
+              <article
+                key={reward.id}
+                className={[
+                  "cq-card p-5",
+                  equipped ? "border-[#72e6a8]/60" : "",
+                  gifted && !equipped ? "border-yellow-300/45" : "",
+                ].join(" ")}
+              >
                 <div className="flex items-start justify-between gap-4">
                   {reward.imageSrc ? (
                     <div
@@ -195,11 +226,18 @@ export default function RewardsPage() {
                   {reward.description}
                 </p>
 
+                <div className={`mt-5 rounded border px-3 py-2 text-sm ${status.className}`}>
+                  {status.label}
+                </div>
+
                 <div className="mt-5 flex flex-wrap gap-2">
                   <span className="cq-badge">{reward.price} moedas</span>
                   <span className="cq-badge">Nivel {reward.levelRequired}</span>
                   {owned && (
                     <span className="cq-badge border-[#72e6a8]/45 text-[#b8ffd8]">Seu item</span>
+                  )}
+                  {gifted && (
+                    <span className="cq-badge border-yellow-300/45 text-yellow-100">Presente</span>
                   )}
                   {reward.petAbility && (
                     getPetAbilityBadges(reward.petAbility).map((label) => (
@@ -218,7 +256,7 @@ export default function RewardsPage() {
                       disabled={rewardsLocked}
                       className="cq-button w-full disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      {rewardsLocked ? "Bloqueado" : equipped ? "Equipado" : "Equipar"}
+                      {rewardsLocked ? "Loja bloqueada" : equipped ? "Equipado agora" : "Equipar item"}
                     </button>
                   ) : (
                     <button
@@ -230,7 +268,7 @@ export default function RewardsPage() {
                       {locked
                         ? "Nivel insuficiente"
                         : rewardsLocked
-                          ? "Bloqueado"
+                          ? "Loja bloqueada"
                           : lacksCoins
                           ? "Moedas insuficientes"
                           : "Comprar"}
@@ -249,6 +287,115 @@ export default function RewardsPage() {
       </section>
     </main>
   );
+}
+
+function ShopStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="cq-panel p-4">
+      <p className="cq-kicker">{label}</p>
+      <p className="mt-2 font-mono text-2xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function getShopStats(
+  rewards: typeof rewardItems,
+  player: ReturnType<typeof usePlayer>["player"],
+  session: LocalSession | null
+) {
+  const visibleRewards = rewards.filter((reward) => (
+    !reward.allowedEmails?.length ||
+    Boolean(session && reward.allowedEmails.includes(session.email.toLowerCase()))
+  ));
+
+  return visibleRewards.reduce((stats, reward) => {
+    const owned = player.inventory.ownedRewardIds.includes(reward.id);
+    const canBuy = !owned &&
+      player.level >= reward.levelRequired &&
+      player.coins >= reward.price;
+
+    return {
+      owned: stats.owned + (owned ? 1 : 0),
+      available: stats.available + (canBuy ? 1 : 0),
+      gifted: stats.gifted + (hasGiftNotification(player.giftNotifications, reward.id) ? 1 : 0),
+      locked: stats.locked + (!owned && !canBuy ? 1 : 0),
+    };
+  }, {
+    owned: 0,
+    available: 0,
+    gifted: 0,
+    locked: 0,
+  });
+}
+
+function hasGiftNotification(
+  giftNotifications: NonNullable<ReturnType<typeof usePlayer>["player"]["giftNotifications"]> | undefined,
+  rewardId: string
+) {
+  return Boolean(giftNotifications?.some((gift) => gift.rewardId === rewardId));
+}
+
+function getRewardStatus({
+  owned,
+  equipped,
+  gifted,
+  rewardsLocked,
+  locked,
+  lacksCoins,
+}: {
+  owned: boolean;
+  equipped: boolean;
+  gifted: boolean;
+  rewardsLocked: boolean;
+  locked: boolean;
+  lacksCoins: boolean;
+}) {
+  if (rewardsLocked) {
+    return {
+      label: "Loja bloqueada pelo admin",
+      className: "border-yellow-300/35 bg-yellow-500/10 text-yellow-100",
+    };
+  }
+
+  if (equipped) {
+    return {
+      label: "Equipado no perfil agora",
+      className: "border-[#72e6a8]/45 bg-[#72e6a8]/10 text-[#b8ffd8]",
+    };
+  }
+
+  if (owned && gifted) {
+    return {
+      label: "Recebido como presente e pronto para usar",
+      className: "border-yellow-300/35 bg-yellow-500/10 text-yellow-100",
+    };
+  }
+
+  if (owned) {
+    return {
+      label: "Voce ja liberou este item",
+      className: "border-[#72e6a8]/45 bg-[#72e6a8]/10 text-[#b8ffd8]",
+    };
+  }
+
+  if (locked) {
+    return {
+      label: "Suba de nivel para desbloquear",
+      className: "border-[#6f91d8]/45 bg-[#6f91d8]/10 text-[#cfe0ff]",
+    };
+  }
+
+  if (lacksCoins) {
+    return {
+      label: "Faltam moedas para comprar",
+      className: "border-[#6f91d8]/45 bg-[#6f91d8]/10 text-[#cfe0ff]",
+    };
+  }
+
+  return {
+    label: "Disponivel para comprar agora",
+    className: "border-[#72e6a8]/45 bg-[#72e6a8]/10 text-[#b8ffd8]",
+  };
 }
 
 function getRewardTierLabel(reward: { rarity?: string; allowedEmails?: string[]; price: number; levelRequired: number }) {

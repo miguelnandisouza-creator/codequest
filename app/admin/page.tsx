@@ -76,6 +76,14 @@ type StageOption = {
 
 type AdminUserTab = "progress" | "rewards" | "password" | "exam" | "history";
 
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+};
+
 export default function AdminPage() {
   const sessionSnapshot = useSyncExternalStore(
     subscribeToLocalAuth,
@@ -88,6 +96,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [storageMode, setStorageMode] = useState<"local" | "supabase" | "">("");
   const [appSettings, setAppSettings] = useState<AppSettingsSummary | null>(null);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [stageOptions, setStageOptions] = useState<StageOption[]>([]);
   const [filter, setFilter] = useState<"all" | "pending" | "active" | "new" | "advanced">("all");
   const [search, setSearch] = useState("");
@@ -230,10 +239,6 @@ export default function AdminPage() {
       return;
     }
 
-    if (!window.confirm("Resetar a campanha de TODOS os usuarios mantendo itens comprados?")) {
-      return;
-    }
-
     setLoading(true);
     setMessage("");
 
@@ -277,15 +282,6 @@ export default function AdminPage() {
     }
 
     const nextMaintenanceMode = !appSettings.maintenanceMode;
-    const confirmed = window.confirm(
-      nextMaintenanceMode
-        ? "Ativar manutencao agora? Alunos vao ver a tela de manutencao."
-        : "Desativar manutencao agora e liberar o site para alunos?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
 
     try {
       const response = await fetch(
@@ -396,7 +392,21 @@ export default function AdminPage() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={toggleMaintenanceMode}
+              onClick={() => {
+                const nextMaintenanceMode = !appSettings?.maintenanceMode;
+
+                setConfirmRequest({
+                  title: nextMaintenanceMode ? "Ativar manutencao" : "Desativar manutencao",
+                  message: nextMaintenanceMode
+                    ? "Alunos vao ver a tela de manutencao ate voce desativar."
+                    : "O site volta a ficar liberado para alunos.",
+                  confirmLabel: nextMaintenanceMode ? "Ativar" : "Desativar",
+                  danger: nextMaintenanceMode,
+                  onConfirm: () => {
+                    void toggleMaintenanceMode();
+                  },
+                });
+              }}
               disabled={!appSettings || appSettings.envForced}
               className={[
                 "cq-button cq-button-secondary",
@@ -413,7 +423,15 @@ export default function AdminPage() {
             </button>
             <button
               type="button"
-              onClick={resetAllProgress}
+              onClick={() => setConfirmRequest({
+                title: "Resetar campanha de todos",
+                message: "Todos os alunos voltam para o inicio da campanha, mantendo itens comprados e liberados.",
+                confirmLabel: "Resetar todos",
+                danger: true,
+                onConfirm: () => {
+                  void resetAllProgress();
+                },
+              })}
               className="cq-button cq-button-secondary border-red-300/50 text-red-100"
             >
               Resetar campanha de todos
@@ -514,6 +532,10 @@ export default function AdminPage() {
             />
           ))}
         </div>
+        <ConfirmDialog
+          request={confirmRequest}
+          onClose={() => setConfirmRequest(null)}
+        />
       </section>
     </main>
   );
@@ -534,6 +556,50 @@ function AdminStat({
       <p className={`mt-2 font-mono font-black ${compact ? "text-base" : "text-2xl"}`}>
         {value}
       </p>
+    </div>
+  );
+}
+
+function ConfirmDialog({
+  request,
+  onClose,
+}: {
+  request: ConfirmRequest | null;
+  onClose: () => void;
+}) {
+  if (!request) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[95] grid place-items-center bg-black/70 px-4 py-8">
+      <section className="cq-panel w-full max-w-md border-[#6f91d8]/55 p-5 shadow-[0_0_40px_rgba(47,102,232,0.2)]">
+        <p className="cq-kicker">Confirmacao</p>
+        <h2 className="cq-title mt-3 text-2xl">{request.title}</h2>
+        <p className="mt-3 whitespace-pre-line leading-6 text-[#c8d3e3]">{request.message}</p>
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="cq-button cq-button-secondary"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              request.onConfirm();
+              onClose();
+            }}
+            className={[
+              "cq-button",
+              request.danger ? "border-red-300/50 bg-red-500/20 text-red-100" : "",
+            ].join(" ")}
+          >
+            {request.confirmLabel ?? "Confirmar"}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
@@ -586,6 +652,8 @@ function AdminUserCard({
   const [examAnswer, setExamAnswer] = useState("SELECT * FROM clientes");
   const [examXp, setExamXp] = useState("80");
   const [examCoins, setExamCoins] = useState("40");
+  const [localMessage, setLocalMessage] = useState("");
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
 
   const completedCount = row.player.progress.completedStages.length;
   const selectedReward = rewardItems.find((reward) => reward.id === rewardId);
@@ -595,10 +663,41 @@ function AdminUserCard({
   const equippedRewards = getEquippedRewards(row.player);
   const latestGift = row.player.giftNotifications?.[0];
 
-  function confirmUpdate(message: string, patch: AdminProgressPatch) {
-    if (window.confirm(message)) {
-      onUpdate(row.user.id, patch);
+  function confirmUpdate(
+    title: string,
+    message: string,
+    detailOrPatch: string | AdminProgressPatch,
+    patchOrOptions?: AdminProgressPatch | {
+      confirmLabel?: string;
+      danger?: boolean;
+      afterConfirm?: () => void;
+    },
+    maybeOptions?: {
+      confirmLabel?: string;
+      danger?: boolean;
+      afterConfirm?: () => void;
     }
+  ) {
+    const hasDetail = typeof detailOrPatch === "string";
+    const detail = hasDetail ? detailOrPatch : "";
+    const patch = hasDetail
+      ? patchOrOptions as AdminProgressPatch
+      : detailOrPatch;
+    const options = hasDetail
+      ? maybeOptions
+      : patchOrOptions as typeof maybeOptions | undefined;
+
+    setLocalMessage("");
+    setConfirmRequest({
+      title,
+      message: detail ? `${message}\n\n${detail}` : message,
+      confirmLabel: options?.confirmLabel,
+      danger: options?.danger,
+      onConfirm: () => {
+        onUpdate(row.user.id, patch);
+        options?.afterConfirm?.();
+      },
+    });
   }
 
   return (
@@ -657,6 +756,12 @@ function AdminUserCard({
             ))}
           </div>
 
+          {localMessage && (
+            <div className="cq-panel mb-5 border-yellow-300/40 p-3 text-sm text-yellow-100">
+              {localMessage}
+            </div>
+          )}
+
           {activeTab === "progress" && (
           <div className="grid gap-3 sm:grid-cols-2 lg:ml-auto lg:max-w-[34rem]">
             <label className="grid gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#93a4bd] sm:col-span-2">
@@ -693,8 +798,10 @@ function AdminUserCard({
           <button
             type="button"
             onClick={() => confirmUpdate(
+              "Salvar dados do aluno",
               `Salvar nome, nivel e moedas de ${row.user.name}?`,
-              { name, coins: Number(coins), level: Number(level) }
+              { name, coins: Number(coins), level: Number(level) },
+              { confirmLabel: "Salvar" }
             )}
             className="cq-button sm:col-span-2"
           >
@@ -722,15 +829,21 @@ function AdminUserCard({
                 type="button"
                 onClick={() => {
                   if (newPassword.trim().length < 6) {
-                    window.alert("A senha precisa ter pelo menos 6 caracteres.");
+                    setLocalMessage("A senha precisa ter pelo menos 6 caracteres.");
                     return;
                   }
 
                   confirmUpdate(
+                    "Redefinir senha",
                     `Redefinir senha de ${row.user.name}?`,
-                    { action: "resetPassword", password: newPassword }
+                    "A senha antiga sera substituida e o aluno devera entrar com a nova senha.",
+                    { action: "resetPassword", password: newPassword },
+                    {
+                      confirmLabel: "Redefinir",
+                      danger: true,
+                      afterConfirm: () => setNewPassword(""),
+                    }
                   );
-                  setNewPassword("");
                 }}
                 className="cq-button cq-button-secondary"
               >
@@ -761,8 +874,11 @@ function AdminUserCard({
           <button
             type="button"
             onClick={() => confirmUpdate(
+              "Trocar fase atual",
               `Trocar fase atual de ${row.user.name}?`,
-              { stageId }
+              "O aluno sera movido para a fase selecionada.",
+              { stageId },
+              { confirmLabel: "Trocar fase" }
             )}
             className="cq-button cq-button-secondary sm:col-span-2"
           >
@@ -772,8 +888,11 @@ function AdminUserCard({
           <button
             type="button"
             onClick={() => confirmUpdate(
+              "Adicionar moedas",
               `Adicionar 500 moedas para ${row.user.name}?`,
-              { coins: row.player.coins + 500 }
+              "O saldo do aluno aumenta imediatamente.",
+              { coins: row.player.coins + 500 },
+              { confirmLabel: "+500 moedas" }
             )}
             className="cq-button cq-button-secondary"
           >
@@ -783,8 +902,11 @@ function AdminUserCard({
           <button
             type="button"
             onClick={() => confirmUpdate(
+              "Adicionar nivel",
               `Adicionar 1 nivel para ${row.user.name}?`,
-              { level: row.player.level + 1 }
+              "O nivel do aluno aumenta imediatamente.",
+              { level: row.player.level + 1 },
+              { confirmLabel: "+1 nivel" }
             )}
             className="cq-button cq-button-secondary"
           >
@@ -794,10 +916,18 @@ function AdminUserCard({
           <button
             type="button"
             onClick={() => confirmUpdate(
+              row.player.inventory.rewardsLocked ? "Desbloquear loja" : "Bloquear loja",
               row.player.inventory.rewardsLocked
                 ? `Desbloquear loja de ${row.user.name}?`
                 : `Bloquear loja de ${row.user.name}?`,
-              { action: "toggleRewardsLock" }
+              row.player.inventory.rewardsLocked
+                ? "O aluno volta a comprar e equipar itens."
+                : "O aluno podera ver a loja, mas nao comprar ou trocar equipamentos.",
+              { action: "toggleRewardsLock" },
+              {
+                confirmLabel: row.player.inventory.rewardsLocked ? "Desbloquear" : "Bloquear",
+                danger: !row.player.inventory.rewardsLocked,
+              }
             )}
             className={[
               "cq-button cq-button-secondary sm:col-span-2",
@@ -887,8 +1017,11 @@ function AdminUserCard({
           <button
             type="button"
             onClick={() => confirmUpdate(
+              "Liberar recompensa",
               `Liberar ${selectedReward?.name ?? "item"} para ${row.user.name}?`,
-              { action: "grantReward", rewardId }
+              "O item entra na conta do aluno sem equipar automaticamente.",
+              { action: "grantReward", rewardId },
+              { confirmLabel: "Liberar" }
             )}
             className="cq-button cq-button-secondary"
           >
@@ -898,8 +1031,11 @@ function AdminUserCard({
           <button
             type="button"
             onClick={() => confirmUpdate(
+              "Presentear e equipar",
               `Presentear ${row.user.name} com ${selectedReward?.name ?? "item"} e equipar agora?`,
-              { action: "giftReward", rewardId }
+              "O aluno recebe uma notificacao de presente e o item ja fica equipado.",
+              { action: "giftReward", rewardId },
+              { confirmLabel: "Presentear" }
             )}
             className="cq-button"
           >
@@ -909,8 +1045,11 @@ function AdminUserCard({
           <button
             type="button"
             onClick={() => confirmUpdate(
+              "Equipar recompensa",
               `Equipar ${selectedReward?.name ?? "item"} em ${row.user.name}?`,
-              { action: "equipReward", rewardId }
+              "O item selecionado vira o equipamento ativo desse tipo.",
+              { action: "equipReward", rewardId },
+              { confirmLabel: "Equipar" }
             )}
             className="cq-button cq-button-secondary"
           >
@@ -974,7 +1113,9 @@ function AdminUserCard({
               <button
                 type="button"
                 onClick={() => confirmUpdate(
+                  "Enviar prova surpresa",
                   `Enviar prova surpresa para ${row.user.name}?`,
+                  "A prova aparece para o aluno ate ele responder.",
                   {
                     action: "assignSurpriseExam",
                     surpriseExam: {
@@ -985,7 +1126,8 @@ function AdminUserCard({
                       rewardXp: Number(examXp),
                       rewardCoins: Number(examCoins),
                     },
-                  }
+                  },
+                  { confirmLabel: "Enviar prova" }
                 )}
                 className="cq-button"
               >
@@ -994,8 +1136,11 @@ function AdminUserCard({
               <button
                 type="button"
                 onClick={() => confirmUpdate(
+                  "Limpar prova pendente",
                   `Limpar prova pendente de ${row.user.name}?`,
-                  { action: "clearSurpriseExam" }
+                  "A prova atual sera removida da conta do aluno.",
+                  { action: "clearSurpriseExam" },
+                  { confirmLabel: "Limpar", danger: true }
                 )}
                 className="cq-button cq-button-secondary"
               >
@@ -1072,11 +1217,17 @@ function AdminUserCard({
                   onClick={() => {
                     const selectedSnapshotId = snapshotId || row.snapshots[0]?.id;
 
-                    if (selectedSnapshotId && window.confirm(`Restaurar backup de ${row.user.name}?`)) {
-                      onUpdate(row.user.id, {
+                    if (selectedSnapshotId) {
+                      confirmUpdate(
+                        "Restaurar backup",
+                        `Restaurar backup de ${row.user.name}?`,
+                        "O progresso atual sera substituido pelo backup selecionado.",
+                        {
                         action: "restoreSnapshot",
                         snapshotId: selectedSnapshotId,
-                      });
+                        },
+                        { confirmLabel: "Restaurar", danger: true }
+                      );
                     }
                   }}
                   className="cq-button cq-button-secondary border-yellow-300/50 text-yellow-100"
@@ -1100,11 +1251,13 @@ function AdminUserCard({
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(`Resetar campanha de ${row.user.name} mantendo os itens comprados?`)) {
-                    onUpdate(row.user.id, { action: "resetProgress" });
-                  }
-                }}
+                onClick={() => confirmUpdate(
+                  "Resetar campanha",
+                  `Resetar campanha de ${row.user.name} mantendo os itens comprados?`,
+                  "Fase, XP, nivel, moedas e conquistas voltam ao inicio. Itens liberados continuam na conta.",
+                  { action: "resetProgress" },
+                  { confirmLabel: "Resetar campanha", danger: true }
+                )}
                 className="cq-button cq-button-secondary border-yellow-300/50 text-yellow-100"
               >
                 Resetar campanha
@@ -1112,11 +1265,13 @@ function AdminUserCard({
 
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(`Reset TOTAL de ${row.user.name}? Isso apaga tambem itens/equipamentos.`)) {
-                    onUpdate(row.user.id, { action: "reset" });
-                  }
-                }}
+                onClick={() => confirmUpdate(
+                  "Reset total",
+                  `Reset TOTAL de ${row.user.name}?`,
+                  "Isso apaga progresso, moedas, nivel, itens, equipamentos e volta a conta para o estado inicial.",
+                  { action: "reset" },
+                  { confirmLabel: "Reset total", danger: true }
+                )}
                 className="cq-button cq-button-secondary border-red-300/50 text-red-100"
               >
                 Reset total
@@ -1127,6 +1282,10 @@ function AdminUserCard({
           )}
         </div>
       )}
+      <ConfirmDialog
+        request={confirmRequest}
+        onClose={() => setConfirmRequest(null)}
+      />
     </article>
   );
 }
