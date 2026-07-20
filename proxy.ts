@@ -9,7 +9,7 @@ export function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (isPublicAsset(pathname)) {
+  if (isPublicAsset(pathname) || canBypassMaintenance(pathname)) {
     return NextResponse.next();
   }
 
@@ -53,6 +53,15 @@ function isPublicAsset(pathname: string) {
     pathname.endsWith(".webp") ||
     pathname.endsWith(".mp4") ||
     pathname.endsWith(".ico")
+  );
+}
+
+function canBypassMaintenance(pathname: string) {
+  return (
+    pathname === "/login" ||
+    pathname === "/admin" ||
+    pathname === "/api/auth/login" ||
+    pathname.startsWith("/api/admin/")
   );
 }
 

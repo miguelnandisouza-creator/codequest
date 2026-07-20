@@ -51,6 +51,12 @@ function buildFeedback(code: string, expectedAnswer: string) {
     return "Comece usando SELECT. Essa missao espera uma consulta de leitura.";
   }
 
+  const sqlOrderFeedback = getSqlClauseOrderFeedback(normalizedCode);
+
+  if (sqlOrderFeedback) {
+    return sqlOrderFeedback;
+  }
+
   const codeClauses = splitSelectClauses(normalizedCode);
   const expectedClauses = splitSelectClauses(normalizedExpected);
 
@@ -60,6 +66,10 @@ function buildFeedback(code: string, expectedAnswer: string) {
 
   if (!codeClauses.from) {
     return "Faltou o FROM com o nome da tabela.";
+  }
+
+  if (hasLikelyMissingSelectComma(codeClauses.select, expectedClauses.select ?? "")) {
+    return "Parece que faltou virgula entre colunas no SELECT.";
   }
 
   if (expectedClauses.from && codeClauses.from !== expectedClauses.from) {
@@ -198,6 +208,22 @@ function buildCodeFeedback(code: string, expectedAnswer: string) {
     return "Essa missao precisa esperar uma Promise ou tarefa assincrona. Use await no ponto indicado.";
   }
 
+  const stringFeedback = compareStringLiterals(trimmedCode, trimmedExpected);
+
+  if (stringFeedback) {
+    return stringFeedback;
+  }
+
+  const operatorFeedback = compareOperators(codeTokens, expectedTokens);
+
+  if (operatorFeedback) {
+    return operatorFeedback;
+  }
+
+  if (needsPythonBlockColon(trimmedCode, trimmedExpected)) {
+    return "Em Python, blocos como if, for, while e def precisam terminar a linha com dois pontos (:).";
+  }
+
   if (expectedTokens.includes(";") && !codeTokens.includes(";")) {
     return "Faltou ponto e virgula em alguma instrucao simples.";
   }
@@ -235,6 +261,101 @@ function buildCodeFeedback(code: string, expectedAnswer: string) {
   }
 
   return "Ainda nao esta correto. Revise nomes, tipos, operadores e a ordem das instrucoes pedidas.";
+}
+
+function getSqlClauseOrderFeedback(sql: string) {
+  const order = [
+    ["select", /\bselect\b/],
+    ["from", /\bfrom\b/],
+    ["where", /\bwhere\b/],
+    ["group by", /\bgroup\s+by\b/],
+    ["having", /\bhaving\b/],
+    ["order by", /\border\s+by\b/],
+    ["limit", /\blimit\b/],
+    ["offset", /\boffset\b/],
+  ] as const;
+  const positions = order
+    .map(([name, pattern]) => ({ name, index: sql.search(pattern) }))
+    .filter((item) => item.index >= 0);
+
+  for (let index = 1; index < positions.length; index += 1) {
+    if (positions[index].index < positions[index - 1].index) {
+      return `A clausula ${positions[index].name.toUpperCase()} apareceu fora de ordem. Em SQL, monte SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT.`;
+    }
+  }
+
+  return "";
+}
+
+function hasLikelyMissingSelectComma(currentSelect: string, expectedSelect: string) {
+  const currentItems = splitTopLevel(currentSelect, ",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const expectedColumns = splitTopLevel(expectedSelect, ",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (currentItems.length !== 1 || expectedColumns.length <= 1) {
+    return false;
+  }
+
+  return currentItems[0].replace(/\s+/g, "") === expectedColumns.join("");
+}
+
+function compareStringLiterals(code: string, expectedAnswer: string) {
+  const expectedStrings = extractStringLiterals(expectedAnswer);
+  const codeStrings = extractStringLiterals(code);
+
+  if (expectedStrings.length === 0) {
+    return "";
+  }
+
+  if (codeStrings.length < expectedStrings.length) {
+    return "Faltou algum texto entre aspas. Confira a mensagem/valor literal pedido no objetivo.";
+  }
+
+  if (expectedStrings.some((value) => !codeStrings.includes(value))) {
+    return "O texto entre aspas esta diferente do pedido. Confira maiusculas, acentos e palavras.";
+  }
+
+  return "";
+}
+
+function compareOperators(codeTokens: string[], expectedTokens: string[]) {
+  const operatorGroups = [
+    ["+=", "incrementar ou acumular"],
+    ["-=", "subtrair acumulando"],
+    ["*", "multiplicar"],
+    ["/", "dividir"],
+    ["%", "calcular resto"],
+    [">=", "comparar maior ou igual"],
+    ["<=", "comparar menor ou igual"],
+    [">", "comparar maior que"],
+    ["<", "comparar menor que"],
+    ["&&", "combinar condicoes com E"],
+    ["||", "combinar condicoes com OU"],
+  ] as const;
+
+  const missingOperator = operatorGroups.find(([operator]) => (
+    expectedTokens.includes(operator) && !codeTokens.includes(operator)
+  ));
+
+  return missingOperator
+    ? `Faltou usar o operador ${missingOperator[0]} para ${missingOperator[1]}.`
+    : "";
+}
+
+function needsPythonBlockColon(code: string, expectedAnswer: string) {
+  if (!isLikelyPython(expectedAnswer) || !/^\s*(if|for|while|def|elif|else|try|except|with)\b/m.test(expectedAnswer)) {
+    return false;
+  }
+
+  return /^\s*(if|for|while|def|elif|else|try|except|with)\b[^\n:]*$/m.test(code);
+}
+
+function extractStringLiterals(text: string) {
+  return [...text.matchAll(/(["'`])((?:\\.|(?!\1).)*)\1/g)]
+    .map((match) => match[2]);
 }
 
 function hasUnbalanced(text: string, open: string, close: string) {

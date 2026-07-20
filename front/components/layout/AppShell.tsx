@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useMemo, useSyncExternalStore } from "react";
+import { ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import AuthStatus from "./AuthStatus";
 import AchievementToastHub from "@/components/achievements/AchievementToastHub";
@@ -26,6 +26,7 @@ type Props = {
 
 export default function AppShell({ children, maintenanceMode = false }: Props) {
   const pathname = usePathname();
+  const [remoteMaintenanceMode, setRemoteMaintenanceMode] = useState(maintenanceMode);
   const sessionSnapshot = useSyncExternalStore(
     subscribeToLocalAuth,
     getLocalSessionSnapshot,
@@ -34,9 +35,35 @@ export default function AppShell({ children, maintenanceMode = false }: Props) {
   const session = useMemo(() => parseJson<LocalSession>(sessionSnapshot), [sessionSnapshot]);
   const isAdmin = isAdminEmail(session?.email);
   const canBypassMaintenance = isAdmin || pathname === "/login" || pathname === "/admin";
+  const activeMaintenanceMode = remoteMaintenanceMode || maintenanceMode;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    queueMicrotask(async () => {
+      try {
+        const response = await fetch("/api/app-settings", {
+          cache: "no-store",
+        });
+        const settings = await response.json() as { maintenanceMode?: boolean };
+
+        if (!cancelled) {
+          setRemoteMaintenanceMode(Boolean(settings.maintenanceMode));
+        }
+      } catch {
+        if (!cancelled) {
+          setRemoteMaintenanceMode(maintenanceMode);
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [maintenanceMode]);
 
   if (pathname === "/") {
-    if (maintenanceMode && !canBypassMaintenance) {
+    if (activeMaintenanceMode && !canBypassMaintenance) {
       return <MaintenanceScreen />;
     }
 
@@ -50,7 +77,7 @@ export default function AppShell({ children, maintenanceMode = false }: Props) {
 
   return (
     <>
-      {maintenanceMode && !canBypassMaintenance ? (
+      {activeMaintenanceMode && !canBypassMaintenance ? (
         <MaintenanceScreen />
       ) : (
         <>

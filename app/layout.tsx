@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AppShell from "@/components/layout/AppShell";
+import { readAppSettings } from "@/infrastructure/settings/appSettingsRepository";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,12 +8,12 @@ export const metadata: Metadata = {
   description: "Aprenda programacao em campanhas gamificadas.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const maintenanceMode = process.env.CODEQUEST_MAINTENANCE === "1";
+  const appSettings = await readAppSettings();
 
   return (
     <html
@@ -20,7 +21,7 @@ export default function RootLayout({
       className="h-full antialiased"
     >
       <body className="flex min-h-full flex-col bg-[#080d16]">
-        <AppShell maintenanceMode={maintenanceMode}>{children}</AppShell>
+        <AppShell maintenanceMode={appSettings.maintenanceMode}>{children}</AppShell>
       </body>
     </html>
   );

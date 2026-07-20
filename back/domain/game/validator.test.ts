@@ -223,4 +223,43 @@ describe("validateAnswer", () => {
       ).message
     ).toContain("Console.WriteLine");
   });
+
+  it("gives specific SQL structure feedback", () => {
+    expect(
+      validateAnswer(
+        "select nome email from clientes",
+        "select nome, email from clientes"
+      ).message
+    ).toContain("virgula");
+
+    expect(
+      validateAnswer(
+        "select * where ativo = true from clientes",
+        "select * from clientes where ativo = true"
+      ).message
+    ).toContain("fora de ordem");
+  });
+
+  it("gives specific code feedback for strings, operators, and Python blocks", () => {
+    expect(
+      validateAnswer(
+        "console.log(\"Ola\")",
+        "console.log(\"Ola, mundo\")"
+      ).message
+    ).toContain("aspas");
+
+    expect(
+      validateAnswer(
+        "total = total + valor;",
+        "total += valor;"
+      ).message
+    ).toContain("+=");
+
+    expect(
+      validateAnswer(
+        "if idade >= 18\n    print(\"Maior\")",
+        "if idade >= 18:\n    print(\"Maior\")"
+      ).message
+    ).toContain("dois pontos");
+  });
 });

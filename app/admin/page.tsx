@@ -58,6 +58,13 @@ type ProgressSnapshotSummary = {
   player: Player;
 };
 
+type AppSettingsSummary = {
+  maintenanceMode: boolean;
+  envForced: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
+};
+
 type StageOption = {
   id: string;
   title: string;
@@ -80,6 +87,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [storageMode, setStorageMode] = useState<"local" | "supabase" | "">("");
+  const [appSettings, setAppSettings] = useState<AppSettingsSummary | null>(null);
   const [stageOptions, setStageOptions] = useState<StageOption[]>([]);
   const [filter, setFilter] = useState<"all" | "pending" | "active" | "new" | "advanced">("all");
   const [search, setSearch] = useState("");
@@ -137,8 +145,16 @@ export default function AdminPage() {
           headers: getAdminRequestHeaders(session),
         }
       );
+      const settingsResponse = await fetch(
+        "/api/admin/app-settings",
+        {
+          cache: "no-store",
+          headers: getAdminRequestHeaders(session),
+        }
+      );
       const data = await response.json() as { rows?: AdminRow[]; stageOptions?: StageOption[]; error?: string };
       const storageData = await storageResponse.json() as { mode?: "local" | "supabase" };
+      const settingsData = await settingsResponse.json() as AppSettingsSummary & { error?: string };
 
       if (!response.ok) {
         throw new Error(data.error ?? "Nao foi possivel carregar usuarios.");
@@ -147,6 +163,7 @@ export default function AdminPage() {
       setRows(data.rows ?? []);
       setStageOptions(data.stageOptions ?? []);
       setStorageMode(storageData.mode ?? "");
+      setAppSettings(settingsResponse.ok ? settingsData : null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erro ao carregar painel.");
     } finally {
@@ -254,6 +271,51 @@ export default function AdminPage() {
     }
   }
 
+  async function toggleMaintenanceMode() {
+    if (!session || !appSettings) {
+      return;
+    }
+
+    const nextMaintenanceMode = !appSettings.maintenanceMode;
+    const confirmed = window.confirm(
+      nextMaintenanceMode
+        ? "Ativar manutencao agora? Alunos vao ver a tela de manutencao."
+        : "Desativar manutencao agora e liberar o site para alunos?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        "/api/admin/app-settings",
+        {
+          method: "PATCH",
+          headers: {
+            ...getAdminRequestHeaders(session),
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            maintenanceMode: nextMaintenanceMode,
+          }),
+        }
+      );
+      const data = await response.json() as AppSettingsSummary & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Nao foi possivel alterar manutencao.");
+      }
+
+      setAppSettings(data);
+      setMessage(data.maintenanceMode
+        ? "Modo manutencao ativado para alunos."
+        : "Modo manutencao desativado.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Erro ao alterar manutencao.");
+    }
+  }
+
   if (!session) {
     return (
       <main className="cq-page">
@@ -332,6 +394,20 @@ export default function AdminPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={toggleMaintenanceMode}
+              disabled={!appSettings || appSettings.envForced}
+              className={[
+                "cq-button cq-button-secondary",
+                appSettings?.maintenanceMode
+                  ? "border-yellow-300/50 text-yellow-100"
+                  : "",
+              ].join(" ")}
+              title={appSettings?.envForced ? "CODEQUEST_MAINTENANCE=1 esta forcando manutencao no ambiente." : undefined}
+            >
+              {appSettings?.maintenanceMode ? "Desativar manutencao" : "Ativar manutencao"}
+            </button>
             <button type="button" onClick={loadRows} className="cq-button cq-button-secondary">
               Atualizar
             </button>
@@ -348,6 +424,22 @@ export default function AdminPage() {
         {storageMode && (
           <div className="cq-panel mt-6 p-4 text-sm text-[#dbe8ff]">
             Armazenamento atual: {storageMode === "supabase" ? "Supabase" : "Local .data"}
+          </div>
+        )}
+
+        {appSettings && (
+          <div className="cq-panel mt-6 p-4 text-sm text-[#dbe8ff]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                Manutencao: {appSettings.maintenanceMode ? "ativa" : "desativada"}
+                {appSettings.envForced ? " (forcada por env)" : ""}
+              </span>
+              {appSettings.updatedAt && (
+                <span className="text-[#93a4bd]">
+                  Atualizado por {appSettings.updatedBy ?? "admin"} em {formatDate(appSettings.updatedAt)}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
