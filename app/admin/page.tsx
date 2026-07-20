@@ -501,6 +501,13 @@ function AdminUserCard({
   const selectedSnapshot = row.snapshots.find((snapshot) => snapshot.id === (snapshotId || row.snapshots[0]?.id));
   const ownedRewards = rewardItems.filter((reward) => row.player.inventory.ownedRewardIds.includes(reward.id));
   const equippedRewards = getEquippedRewards(row.player);
+  const latestGift = row.player.giftNotifications?.[0];
+
+  function confirmUpdate(message: string, patch: AdminProgressPatch) {
+    if (window.confirm(message)) {
+      onUpdate(row.user.id, patch);
+    }
+  }
 
   return (
     <article className="cq-card p-5">
@@ -593,7 +600,10 @@ function AdminUserCard({
 
           <button
             type="button"
-            onClick={() => onUpdate(row.user.id, { name, coins: Number(coins), level: Number(level) })}
+            onClick={() => confirmUpdate(
+              `Salvar nome, nivel e moedas de ${row.user.name}?`,
+              { name, coins: Number(coins), level: Number(level) }
+            )}
             className="cq-button sm:col-span-2"
           >
             Salvar nome/nivel/moedas
@@ -624,7 +634,10 @@ function AdminUserCard({
                     return;
                   }
 
-                  onUpdate(row.user.id, { action: "resetPassword", password: newPassword });
+                  confirmUpdate(
+                    `Redefinir senha de ${row.user.name}?`,
+                    { action: "resetPassword", password: newPassword }
+                  );
                   setNewPassword("");
                 }}
                 className="cq-button cq-button-secondary"
@@ -655,7 +668,10 @@ function AdminUserCard({
 
           <button
             type="button"
-            onClick={() => onUpdate(row.user.id, { stageId })}
+            onClick={() => confirmUpdate(
+              `Trocar fase atual de ${row.user.name}?`,
+              { stageId }
+            )}
             className="cq-button cq-button-secondary sm:col-span-2"
           >
             Trocar fase atual
@@ -663,7 +679,10 @@ function AdminUserCard({
 
           <button
             type="button"
-            onClick={() => onUpdate(row.user.id, { coins: row.player.coins + 500 })}
+            onClick={() => confirmUpdate(
+              `Adicionar 500 moedas para ${row.user.name}?`,
+              { coins: row.player.coins + 500 }
+            )}
             className="cq-button cq-button-secondary"
           >
             +500 moedas
@@ -671,7 +690,10 @@ function AdminUserCard({
 
           <button
             type="button"
-            onClick={() => onUpdate(row.user.id, { level: row.player.level + 1 })}
+            onClick={() => confirmUpdate(
+              `Adicionar 1 nivel para ${row.user.name}?`,
+              { level: row.player.level + 1 }
+            )}
             className="cq-button cq-button-secondary"
           >
             +1 nivel
@@ -679,7 +701,12 @@ function AdminUserCard({
 
           <button
             type="button"
-            onClick={() => onUpdate(row.user.id, { action: "toggleRewardsLock" })}
+            onClick={() => confirmUpdate(
+              row.player.inventory.rewardsLocked
+                ? `Desbloquear loja de ${row.user.name}?`
+                : `Bloquear loja de ${row.user.name}?`,
+              { action: "toggleRewardsLock" }
+            )}
             className={[
               "cq-button cq-button-secondary sm:col-span-2",
               row.player.inventory.rewardsLocked
@@ -745,9 +772,32 @@ function AdminUserCard({
             </select>
           </label>
 
+          {selectedReward && (
+            <div className="rounded border border-[#26384f] bg-[#07101d] p-3 text-sm text-[#c8d3e3] sm:col-span-2">
+              <p className="font-mono text-xs font-black uppercase tracking-[0.12em] text-[#93a4bd]">
+                Item selecionado
+              </p>
+              <p className="mt-2">
+                {selectedReward.name} - {getRewardKindLabel(selectedReward.kind)}
+              </p>
+              <p className="mt-1 text-[#93a4bd]">
+                Requer nivel {selectedReward.levelRequired}, custa {selectedReward.price} moedas.
+              </p>
+            </div>
+          )}
+
+          {latestGift && (
+            <div className="rounded border border-yellow-300/35 bg-yellow-500/10 p-3 text-sm text-yellow-100 sm:col-span-2">
+              Ultimo presente: {latestGift.rewardName} em {formatDate(latestGift.createdAt)}.
+            </div>
+          )}
+
           <button
             type="button"
-            onClick={() => onUpdate(row.user.id, { action: "grantReward", rewardId })}
+            onClick={() => confirmUpdate(
+              `Liberar ${selectedReward?.name ?? "item"} para ${row.user.name}?`,
+              { action: "grantReward", rewardId }
+            )}
             className="cq-button cq-button-secondary"
           >
             Liberar {selectedReward ? getRewardKindLabel(selectedReward.kind).toLowerCase() : "item"}
@@ -755,7 +805,10 @@ function AdminUserCard({
 
           <button
             type="button"
-            onClick={() => onUpdate(row.user.id, { action: "giftReward", rewardId })}
+            onClick={() => confirmUpdate(
+              `Presentear ${row.user.name} com ${selectedReward?.name ?? "item"} e equipar agora?`,
+              { action: "giftReward", rewardId }
+            )}
             className="cq-button"
           >
             Presentear e equipar
@@ -763,7 +816,10 @@ function AdminUserCard({
 
           <button
             type="button"
-            onClick={() => onUpdate(row.user.id, { action: "equipReward", rewardId })}
+            onClick={() => confirmUpdate(
+              `Equipar ${selectedReward?.name ?? "item"} em ${row.user.name}?`,
+              { action: "equipReward", rewardId }
+            )}
             className="cq-button cq-button-secondary"
           >
             Equipar
@@ -825,24 +881,30 @@ function AdminUserCard({
               </div>
               <button
                 type="button"
-                onClick={() => onUpdate(row.user.id, {
-                  action: "assignSurpriseExam",
-                  surpriseExam: {
-                    title: examTitle,
-                    question: examQuestion,
-                    options: examOptions.split(/\r?\n/),
-                    correctAnswer: examAnswer,
-                    rewardXp: Number(examXp),
-                    rewardCoins: Number(examCoins),
-                  },
-                })}
+                onClick={() => confirmUpdate(
+                  `Enviar prova surpresa para ${row.user.name}?`,
+                  {
+                    action: "assignSurpriseExam",
+                    surpriseExam: {
+                      title: examTitle,
+                      question: examQuestion,
+                      options: examOptions.split(/\r?\n/),
+                      correctAnswer: examAnswer,
+                      rewardXp: Number(examXp),
+                      rewardCoins: Number(examCoins),
+                    },
+                  }
+                )}
                 className="cq-button"
               >
                 Enviar prova para usuario
               </button>
               <button
                 type="button"
-                onClick={() => onUpdate(row.user.id, { action: "clearSurpriseExam" })}
+                onClick={() => confirmUpdate(
+                  `Limpar prova pendente de ${row.user.name}?`,
+                  { action: "clearSurpriseExam" }
+                )}
                 className="cq-button cq-button-secondary"
               >
                 Limpar prova pendente

@@ -7,6 +7,7 @@ import { ReactNode, useMemo, useSyncExternalStore } from "react";
 import AuthStatus from "./AuthStatus";
 import AchievementToastHub from "@/components/achievements/AchievementToastHub";
 import ChatNotificationHub from "@/components/chat/ChatNotificationHub";
+import GiftNotificationHub from "@/components/rewards/GiftNotificationHub";
 import {
   getLocalSessionSnapshot,
   getServerLocalSessionSnapshot,
@@ -20,9 +21,10 @@ import { isAdminEmail } from "@/data/admin";
 
 type Props = {
   children: ReactNode;
+  maintenanceMode?: boolean;
 };
 
-export default function AppShell({ children }: Props) {
+export default function AppShell({ children, maintenanceMode = false }: Props) {
   const pathname = usePathname();
   const sessionSnapshot = useSyncExternalStore(
     subscribeToLocalAuth,
@@ -31,8 +33,13 @@ export default function AppShell({ children }: Props) {
   );
   const session = useMemo(() => parseJson<LocalSession>(sessionSnapshot), [sessionSnapshot]);
   const isAdmin = isAdminEmail(session?.email);
+  const canBypassMaintenance = isAdmin || pathname === "/login" || pathname === "/admin";
 
   if (pathname === "/") {
+    if (maintenanceMode && !canBypassMaintenance) {
+      return <MaintenanceScreen />;
+    }
+
     return (
       <>
         <RewardStyleSync />
@@ -43,6 +50,10 @@ export default function AppShell({ children }: Props) {
 
   return (
     <>
+      {maintenanceMode && !canBypassMaintenance ? (
+        <MaintenanceScreen />
+      ) : (
+        <>
       <header className="sticky top-0 z-50 border-b border-[#22324a] bg-[#070c15]/92 backdrop-blur">
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3 text-white md:px-6">
           <Link
@@ -95,10 +106,30 @@ export default function AppShell({ children }: Props) {
       {children}
       <RewardStyleSync />
       <ChatNotificationHub />
+      <GiftNotificationHub />
       <AchievementToastHub />
       <SurpriseExamModal />
       <PetCompanion />
+        </>
+      )}
     </>
+  );
+}
+
+function MaintenanceScreen() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#050914] px-5 text-[#eef4ff]">
+      <section className="w-full max-w-2xl rounded-md border border-[#24344d] bg-[#0a1220] p-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+        <p className="cq-kicker">CodeQuest</p>
+        <h1 className="cq-title mt-4 text-4xl md:text-6xl">Em manutencao</h1>
+        <p className="mx-auto mt-5 max-w-lg leading-7 text-[#93a4bd]">
+          Estamos atualizando missoes, recompensas e progresso. Volte em alguns minutos.
+        </p>
+        <Link href="/login" className="cq-button cq-button-secondary mt-8">
+          Entrar como admin
+        </Link>
+      </section>
+    </main>
   );
 }
 

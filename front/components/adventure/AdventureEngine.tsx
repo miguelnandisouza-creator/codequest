@@ -42,6 +42,9 @@ export default function AdventureEngine({
   const current = stage.content[step];
   const isLastStep = step === stage.content.length - 1;
   const nextLabel = isLastStep ? "Concluir etapa" : "Proximo";
+  const stepNumber = step + 1;
+  const progressPercent = Math.round((stepNumber / stage.content.length) * 100);
+  const currentTypeLabel = getContentTypeLabel(current.type);
   const language = stage.language ?? "sql";
   const gatedHint = chapter.order >= 4 && campaign.id === "sql"
     ? {
@@ -127,13 +130,26 @@ export default function AdventureEngine({
           </Link>
         </div>
       ) : completed ? (
-        <div className="cq-panel border-green-300/40 p-6">
-          <h2 className="cq-title text-2xl">
-            Etapa concluida
-          </h2>
+        <div className="cq-panel overflow-hidden border-green-300/40 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="cq-kicker">Missao completa</p>
+              <h2 className="cq-title mt-3 text-2xl">
+                Etapa concluida
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-center font-mono">
+              <span className="rounded border border-green-300/35 bg-green-500/10 px-4 py-3 text-green-100">
+                +{stage.reward.xp} XP
+              </span>
+              <span className="rounded border border-yellow-300/35 bg-yellow-500/10 px-4 py-3 text-yellow-100">
+                +{stage.reward.coins} moedas
+              </span>
+            </div>
+          </div>
 
           <p className="mt-3 text-[#c8d3e3]">
-            Voce recebeu {stage.reward.xp} XP e {stage.reward.coins} moedas.
+            Recompensa salva na sua conta. Continue para a proxima fase ou volte ao capitulo para escolher outro caminho.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -156,6 +172,24 @@ export default function AdventureEngine({
         </div>
       ) : (
         <div className="cq-panel p-6 md:p-8">
+          <div className="mb-7 rounded-md border border-[#26384f] bg-[#07101d] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="cq-kicker">Progresso da aula</p>
+                <p className="mt-2 font-mono text-sm text-[#dbe8ff]">
+                  Passo {stepNumber} de {stage.content.length} - {currentTypeLabel}
+                </p>
+              </div>
+              <span className="cq-badge">{progressPercent}%</span>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#0b1424]">
+              <div
+                className="h-full rounded-full bg-[#5b8cff] transition-all"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+
           {current.type === "text" && (
             <TextStep
               key={`${stage.id}-${step}`}
@@ -229,6 +263,14 @@ export default function AdventureEngine({
       )}
     </div>
   );
+}
+
+function getContentTypeLabel(type: Stage["content"][number]["type"]) {
+  if (type === "text") return "Teoria";
+  if (type === "example") return "Exemplo";
+  if (type === "quiz") return "Quiz";
+  if (type === "boss") return "Chefe";
+  return "Desafio";
 }
 
 function getPreviousStageProgress(campaign: Campaign, stageId: string) {

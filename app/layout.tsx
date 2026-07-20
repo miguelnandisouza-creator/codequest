@@ -12,13 +12,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const maintenanceMode = process.env.CODEQUEST_MAINTENANCE === "1";
+
   return (
     <html
       lang="pt-BR"
       className="h-full antialiased"
     >
       <body className="flex min-h-full flex-col bg-[#080d16]">
-        <AppShell>{children}</AppShell>
+        <AppShell maintenanceMode={maintenanceMode}>{children}</AppShell>
       </body>
     </html>
   );
