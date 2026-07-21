@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 
 import { usePlayer } from "@/application/hooks/usePlayer";
 import {
@@ -32,7 +32,6 @@ export default function RewardsPage() {
   const { player, buyReward, equipReward } = usePlayer();
   const [activeTab, setActiveTab] = useState<RewardKind>("avatar");
   const [rewardFilter, setRewardFilter] = useState<"all" | "owned" | "available" | "gifted" | "exclusive" | "legendary">("all");
-  const [showCryptoTool, setShowCryptoTool] = useState(false);
   const rewardsLocked = Boolean(player.inventory.rewardsLocked);
   const sessionSnapshot = useSyncExternalStore(
     subscribeToLocalAuth,
@@ -81,29 +80,6 @@ export default function RewardsPage() {
   });
   const activeTabRewards = rewardItems.filter((reward) => reward.kind === activeTab);
   const shopStats = getShopStats(activeTabRewards, player, session);
-
-  useEffect(() => {
-    const shouldShowCryptoTool = new URLSearchParams(window.location.search).get("crypto") === "1";
-    const frame = shouldShowCryptoTool
-      ? window.requestAnimationFrame(() => setShowCryptoTool(true))
-      : undefined;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setShowCryptoTool((current) => !current);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      if (frame) {
-        window.cancelAnimationFrame(frame);
-      }
-
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
 
   return (
     <main className="cq-page">
@@ -175,8 +151,6 @@ export default function RewardsPage() {
             Loja bloqueada pelo admin. Voce pode ver os itens, mas nao comprar ou trocar equipamentos agora.
           </div>
         )}
-
-        {showCryptoTool && <LocalPasswordHashTool />}
 
         <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {visibleRewards.map((reward) => {
@@ -321,160 +295,6 @@ function ShopStat({ label, value }: { label: string; value: number }) {
       <p className="cq-kicker">{label}</p>
       <p className="mt-2 font-mono text-2xl font-black">{value}</p>
     </div>
-  );
-}
-
-function LocalPasswordHashTool() {
-  const [password, setPassword] = useState("");
-  const [generatedHash, setGeneratedHash] = useState("");
-  const [verifyPassword, setVerifyPassword] = useState("");
-  const [hashToVerify, setHashToVerify] = useState("");
-  const [verifyResult, setVerifyResult] = useState<"idle" | "valid" | "invalid">("idle");
-  const [error, setError] = useState("");
-  const [isWorking, setIsWorking] = useState(false);
-
-  async function handleGenerateHash() {
-    setError("");
-    setVerifyResult("idle");
-
-    if (!password) {
-      setError("Digite uma senha para gerar o hash.");
-      return;
-    }
-
-    setIsWorking(true);
-
-    try {
-      setGeneratedHash(await generatePasswordHash(password));
-    } catch {
-      setError("Nao foi possivel gerar o hash neste navegador.");
-    } finally {
-      setIsWorking(false);
-    }
-  }
-
-  async function handleVerifyHash() {
-    setError("");
-    setVerifyResult("idle");
-
-    if (!verifyPassword || !hashToVerify) {
-      setError("Preencha a senha e o hash para testar.");
-      return;
-    }
-
-    setIsWorking(true);
-
-    try {
-      setVerifyResult(await verifyPasswordHash(verifyPassword, hashToVerify) ? "valid" : "invalid");
-    } catch {
-      setError("Hash invalido ou navegador sem suporte a Web Crypto.");
-    } finally {
-      setIsWorking(false);
-    }
-  }
-
-  function handleClear() {
-    setPassword("");
-    setGeneratedHash("");
-    setVerifyPassword("");
-    setHashToVerify("");
-    setVerifyResult("idle");
-    setError("");
-  }
-
-  return (
-    <section className="cq-panel mt-6 border-[#72e6a8]/45 p-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="cq-kicker">Ferramenta local</p>
-          <h2 className="cq-title mt-2 text-2xl">Hash de senha</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#93a4bd]">
-            PBKDF2 SHA-256 com salt aleatorio. Nada e enviado para o servidor e nada fica salvo no site.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleClear}
-          className="cq-button cq-button-secondary md:min-w-28"
-        >
-          Limpar
-        </button>
-      </div>
-
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <div className="rounded border border-[#6f91d8]/35 bg-[#101827]/70 p-4">
-          <label className="block text-sm font-bold text-[#e5edf9]" htmlFor="local-password-hash">
-            Senha
-          </label>
-          <input
-            id="local-password-hash"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 w-full rounded border border-[#6f91d8]/45 bg-[#060913] px-3 py-2 text-[#e5edf9] outline-none focus:border-[#72e6a8]"
-            autoComplete="new-password"
-          />
-          <button
-            type="button"
-            onClick={handleGenerateHash}
-            disabled={isWorking}
-            className="cq-button mt-3 w-full disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {isWorking ? "Processando" : "Gerar hash local"}
-          </button>
-          <textarea
-            value={generatedHash}
-            readOnly
-            className="mt-3 min-h-28 w-full resize-y rounded border border-[#6f91d8]/35 bg-[#060913] p-3 font-mono text-xs text-[#cfe0ff] outline-none"
-            placeholder="O hash aparece aqui"
-          />
-        </div>
-
-        <div className="rounded border border-[#6f91d8]/35 bg-[#101827]/70 p-4">
-          <label className="block text-sm font-bold text-[#e5edf9]" htmlFor="local-password-verify">
-            Testar senha
-          </label>
-          <input
-            id="local-password-verify"
-            type="password"
-            value={verifyPassword}
-            onChange={(event) => setVerifyPassword(event.target.value)}
-            className="mt-2 w-full rounded border border-[#6f91d8]/45 bg-[#060913] px-3 py-2 text-[#e5edf9] outline-none focus:border-[#72e6a8]"
-            autoComplete="new-password"
-          />
-          <textarea
-            value={hashToVerify}
-            onChange={(event) => setHashToVerify(event.target.value)}
-            className="mt-3 min-h-24 w-full resize-y rounded border border-[#6f91d8]/35 bg-[#060913] p-3 font-mono text-xs text-[#cfe0ff] outline-none focus:border-[#72e6a8]"
-            placeholder="Cole o hash para conferir"
-          />
-          <button
-            type="button"
-            onClick={handleVerifyHash}
-            disabled={isWorking}
-            className="cq-button mt-3 w-full disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            Conferir
-          </button>
-          {verifyResult !== "idle" && (
-            <div className={`mt-3 rounded border px-3 py-2 text-sm ${
-              verifyResult === "valid"
-                ? "border-[#72e6a8]/45 bg-[#72e6a8]/10 text-[#b8ffd8]"
-                : "border-red-300/45 bg-red-500/10 text-red-100"
-            }`}
-            >
-              {verifyResult === "valid" ? "Senha confere com o hash." : "Senha diferente do hash."}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <div className="mt-4 rounded border border-red-300/45 bg-red-500/10 px-3 py-2 text-sm text-red-100">
-          {error}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -679,87 +499,4 @@ function getPetAbilityBadges(ability: {
   }
 
   return badges;
-}
-
-async function generatePasswordHash(password: string) {
-  if (!globalThis.crypto?.subtle) {
-    throw new Error("Web Crypto unavailable");
-  }
-
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iterations = 210000;
-  const hash = await derivePasswordHash(password, salt, iterations);
-
-  return `pbkdf2_sha256$${iterations}$${bytesToBase64(salt)}$${bytesToBase64(hash)}`;
-}
-
-async function verifyPasswordHash(password: string, storedHash: string) {
-  const [algorithm, iterationsValue, saltValue, hashValue] = storedHash.trim().split("$");
-  const iterations = Number(iterationsValue);
-
-  if (algorithm !== "pbkdf2_sha256" || !Number.isInteger(iterations) || iterations < 100000 || !saltValue || !hashValue) {
-    return false;
-  }
-
-  const salt = base64ToBytes(saltValue);
-  const expectedHash = base64ToBytes(hashValue);
-  const actualHash = await derivePasswordHash(password, salt, iterations);
-
-  return bytesEqual(actualHash, expectedHash);
-}
-
-async function derivePasswordHash(password: string, salt: Uint8Array, iterations: number) {
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt: bytesToArrayBuffer(salt),
-      iterations,
-      hash: "SHA-256",
-    },
-    keyMaterial,
-    256
-  );
-
-  return new Uint8Array(derivedBits);
-}
-
-function bytesToBase64(bytes: Uint8Array) {
-  let binary = "";
-
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-
-  return btoa(binary);
-}
-
-function base64ToBytes(value: string) {
-  const binary = atob(value);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
-
-function bytesToArrayBuffer(bytes: Uint8Array) {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
-function bytesEqual(left: Uint8Array, right: Uint8Array) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let diff = 0;
-
-  left.forEach((byte, index) => {
-    diff |= byte ^ right[index];
-  });
-
-  return diff === 0;
 }
