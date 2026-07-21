@@ -29,25 +29,45 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => null) as {
     maintenanceMode?: boolean;
+    focusGuardEnabled?: boolean;
   } | null;
 
-  if (typeof body?.maintenanceMode !== "boolean") {
-    return Response.json({ error: "Modo de manutencao invalido." }, { status: 400 });
+  if (
+    typeof body?.maintenanceMode !== "boolean" &&
+    typeof body?.focusGuardEnabled !== "boolean"
+  ) {
+    return Response.json({ error: "Configuracao invalida." }, { status: 400 });
   }
 
   const session = getSessionRequestPayload(request);
+  const patch = {
+    ...(typeof body.maintenanceMode === "boolean" ? { maintenanceMode: body.maintenanceMode } : {}),
+    ...(typeof body.focusGuardEnabled === "boolean" ? { focusGuardEnabled: body.focusGuardEnabled } : {}),
+  };
   const settings = await writeAppSettings(
-    { maintenanceMode: body.maintenanceMode },
+    patch,
     session?.email ?? "admin"
   );
-  await recordAdminAction({
-    action: "maintenanceMode",
-    label: settings.maintenanceMode ? "Ativou manutencao" : "Desativou manutencao",
-    actorEmail: session?.email ?? "admin",
-    details: settings.maintenanceMode
-      ? "Alunos passam a ver a tela de manutencao."
-      : "Site liberado para alunos.",
-  });
+  if (typeof body.maintenanceMode === "boolean") {
+    await recordAdminAction({
+      action: "maintenanceMode",
+      label: settings.maintenanceMode ? "Ativou manutencao" : "Desativou manutencao",
+      actorEmail: session?.email ?? "admin",
+      details: settings.maintenanceMode
+        ? "Alunos passam a ver a tela de manutencao."
+        : "Site liberado para alunos.",
+    });
+  }
+  if (typeof body.focusGuardEnabled === "boolean") {
+    await recordAdminAction({
+      action: "focusGuard",
+      label: settings.focusGuardEnabled ? "Ativou modo foco" : "Desativou modo foco",
+      actorEmail: session?.email ?? "admin",
+      details: settings.focusGuardEnabled
+        ? "Fases pausam quando o aluno sai da aba, perde foco ou cola texto."
+        : "Fases nao pausam por troca de aba ou colagem.",
+    });
+  }
 
   return Response.json(settings);
 }

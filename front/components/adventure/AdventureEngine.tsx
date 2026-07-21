@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { usePlayer } from "@/application/hooks/usePlayer";
 import { Campaign } from "@/domain/entities/campaign";
@@ -37,6 +37,8 @@ export default function AdventureEngine({
   const [step, setStep] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [sceneResolved, setSceneResolved] = useState(false);
+  const [focusGuardEnabled, setFocusGuardEnabled] = useState(true);
+  const [workspaceTab, setWorkspaceTab] = useState<"mission" | "guide">("mission");
   const sceneRef = useRef<HTMLDivElement>(null);
   const { player, completeStage, celebratePet } = usePlayer();
 
@@ -60,10 +62,36 @@ export default function AdventureEngine({
     stageStatus !== "locked"
   );
 
+  useEffect(() => {
+    let cancelled = false;
+
+    queueMicrotask(async () => {
+      try {
+        const response = await fetch("/api/app-settings", {
+          cache: "no-store",
+        });
+        const settings = await response.json() as { focusGuardEnabled?: boolean };
+
+        if (!cancelled) {
+          setFocusGuardEnabled(settings.focusGuardEnabled ?? true);
+        }
+      } catch {
+        if (!cancelled) {
+          setFocusGuardEnabled(true);
+        }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function next() {
     if (!isLastStep) {
       setStep((prev) => prev + 1);
       setSceneResolved(false);
+      setWorkspaceTab("mission");
       return;
     }
 
@@ -98,7 +126,7 @@ export default function AdventureEngine({
   return (
     <div className="mx-auto max-w-6xl">
       <FocusGuard
-        active={unlocked && !completed}
+        active={focusGuardEnabled && unlocked && !completed}
         stageTitle={stage.title}
       />
 
@@ -196,79 +224,147 @@ export default function AdventureEngine({
             </div>
           </div>
 
-          {current.type === "text" && (
-            <TextStep
-              key={`${stage.id}-${step}`}
-              title={current.title}
-              content={current.content}
-              onNext={next}
-              nextLabel={nextLabel}
-            />
-          )}
+          <div className="mb-6 flex flex-wrap gap-2">
+            {[
+              ["mission", "Missao"],
+              ["guide", "Guia da aula"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setWorkspaceTab(value as typeof workspaceTab)}
+                className={`cq-button ${workspaceTab === value ? "" : "cq-button-secondary"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-          {current.type === "example" && (
-            <ExampleStep
-              key={`${stage.id}-${step}`}
-              title={current.title}
-              explanation={current.explanation}
-              code={current.code}
-              result={current.result}
-              onNext={next}
-              nextLabel={nextLabel}
-            />
-          )}
+          {workspaceTab === "guide" ? (
+            <StageStudyGuide stage={stage} currentStep={step} />
+          ) : (
+            <>
+              {current.type === "text" && (
+                <TextStep
+                  key={`${stage.id}-${step}`}
+                  title={current.title}
+                  content={current.content}
+                  onNext={next}
+                  nextLabel={nextLabel}
+                />
+              )}
 
-          {current.type === "challenge" && (
-            <ChallengeStep
-              key={`${stage.id}-${step}`}
-              stageId={stage.id}
-              title={current.title}
-              objective={current.objective}
-              expectedAnswer={current.expectedAnswer}
-              hint={current.hint}
-              language={language}
-              gatedHint={gatedHint}
-              onSuccess={next}
-              onSolved={resolveScene}
-              onReviewTheory={reviewTheory}
-              successLabel={nextLabel}
-            />
-          )}
+              {current.type === "example" && (
+                <ExampleStep
+                  key={`${stage.id}-${step}`}
+                  title={current.title}
+                  explanation={current.explanation}
+                  code={current.code}
+                  result={current.result}
+                  onNext={next}
+                  nextLabel={nextLabel}
+                />
+              )}
 
-          {current.type === "quiz" && (
-            <QuizStep
-              stageId={stage.id}
-              title={current.title}
-              question={current.question}
-              options={current.options}
-              correctAnswer={current.correctAnswer}
-              explanation={current.explanation}
-              onSuccess={next}
-              onSolved={resolveScene}
-              successLabel={nextLabel}
-            />
-          )}
+              {current.type === "challenge" && (
+                <ChallengeStep
+                  key={`${stage.id}-${step}`}
+                  stageId={stage.id}
+                  title={current.title}
+                  objective={current.objective}
+                  expectedAnswer={current.expectedAnswer}
+                  hint={current.hint}
+                  language={language}
+                  gatedHint={gatedHint}
+                  onSuccess={next}
+                  onSolved={resolveScene}
+                  onReviewTheory={reviewTheory}
+                  successLabel={nextLabel}
+                />
+              )}
 
-          {current.type === "boss" && (
-            <ChallengeStep
-              key={`${stage.id}-${step}`}
-              stageId={stage.id}
-              title={current.title}
-              objective={current.objective}
-              expectedAnswer={current.expectedAnswer}
-              hint={current.hint}
-              language={language}
-              gatedHint={gatedHint}
-              onSuccess={next}
-              onSolved={resolveScene}
-              onReviewTheory={reviewTheory}
-              successLabel={nextLabel}
-            />
+              {current.type === "quiz" && (
+                <QuizStep
+                  stageId={stage.id}
+                  title={current.title}
+                  question={current.question}
+                  options={current.options}
+                  correctAnswer={current.correctAnswer}
+                  explanation={current.explanation}
+                  onSuccess={next}
+                  onSolved={resolveScene}
+                  successLabel={nextLabel}
+                />
+              )}
+
+              {current.type === "boss" && (
+                <ChallengeStep
+                  key={`${stage.id}-${step}`}
+                  stageId={stage.id}
+                  title={current.title}
+                  objective={current.objective}
+                  expectedAnswer={current.expectedAnswer}
+                  hint={current.hint}
+                  language={language}
+                  gatedHint={gatedHint}
+                  onSuccess={next}
+                  onSolved={resolveScene}
+                  onReviewTheory={reviewTheory}
+                  successLabel={nextLabel}
+                />
+              )}
+            </>
           )}
         </div>
       )}
     </div>
   );
+}
+
+function StageStudyGuide({
+  stage,
+  currentStep,
+}: {
+  stage: Stage;
+  currentStep: number;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="cq-kicker">Mapa da aula</p>
+        <h2 className="cq-title mt-2 text-2xl">{stage.title}</h2>
+        <p className="mt-3 leading-7 text-[#93a4bd]">{stage.description}</p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {stage.content.map((item, index) => (
+          <article
+            key={`${item.type}-${index}`}
+            className={[
+              "rounded border bg-[#07101d] p-4",
+              index === currentStep ? "border-[#72e6a8]/50" : "border-[#26384f]",
+            ].join(" ")}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="cq-badge">Passo {index + 1}</span>
+              <span className="cq-badge">{getContentTypeLabel(item.type)}</span>
+            </div>
+            <h3 className="cq-title mt-3 text-xl">{item.title}</h3>
+            <p className="mt-2 text-sm leading-6 text-[#93a4bd]">
+              {getGuideSummary(item)}
+            </p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function getGuideSummary(item: Stage["content"][number]) {
+  if (item.type === "text") return item.content;
+  if (item.type === "example") return item.explanation;
+  if (item.type === "quiz") return item.question;
+  return item.objective;
 }
 
 function getContentTypeLabel(type: Stage["content"][number]["type"]) {

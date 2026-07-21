@@ -10,6 +10,7 @@ const canWriteLocalFiles = process.env.VERCEL !== "1";
 
 export type AppSettings = {
   maintenanceMode: boolean;
+  focusGuardEnabled: boolean;
   envForced: boolean;
   updatedAt?: string;
   updatedBy?: string;
@@ -17,6 +18,7 @@ export type AppSettings = {
 
 type StoredAppSettings = {
   maintenanceMode?: boolean;
+  focusGuardEnabled?: boolean;
   updatedAt?: string;
   updatedBy?: string;
 };
@@ -33,13 +35,14 @@ export async function readAppSettings(): Promise<AppSettings> {
 }
 
 export async function writeAppSettings(
-  patch: Partial<Pick<AppSettings, "maintenanceMode">>,
+  patch: Partial<Pick<AppSettings, "maintenanceMode" | "focusGuardEnabled">>,
   updatedBy: string
 ): Promise<AppSettings> {
   const currentSettings = await readPersistedSettings();
   const nextSettings: StoredAppSettings = {
     ...currentSettings,
-    maintenanceMode: Boolean(patch.maintenanceMode),
+    maintenanceMode: patch.maintenanceMode ?? Boolean(currentSettings.maintenanceMode),
+    focusGuardEnabled: patch.focusGuardEnabled ?? currentSettings.focusGuardEnabled ?? true,
     updatedAt: new Date().toISOString(),
     updatedBy,
   };
@@ -113,6 +116,7 @@ function normalizeSettings(settings: StoredAppSettings): AppSettings {
 
   return {
     maintenanceMode: envForced || Boolean(settings.maintenanceMode),
+    focusGuardEnabled: settings.focusGuardEnabled ?? true,
     envForced,
     updatedAt: settings.updatedAt,
     updatedBy: settings.updatedBy,

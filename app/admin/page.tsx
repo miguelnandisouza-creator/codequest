@@ -60,6 +60,7 @@ type ProgressSnapshotSummary = {
 
 type AppSettingsSummary = {
   maintenanceMode: boolean;
+  focusGuardEnabled: boolean;
   envForced: boolean;
   updatedAt?: string;
   updatedBy?: string;
@@ -87,6 +88,16 @@ type StageOption = {
 };
 
 type AdminUserTab = "progress" | "rewards" | "password" | "exam" | "history";
+type AdminFilter =
+  | "all"
+  | "pending"
+  | "active"
+  | "new"
+  | "advanced"
+  | "shopLocked"
+  | "gifted"
+  | "noAttempts"
+  | "recentErrors";
 
 type ConfirmRequest = {
   title: string;
@@ -111,7 +122,7 @@ export default function AdminPage() {
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [auditLog, setAuditLog] = useState<AdminAuditRecord[]>([]);
   const [stageOptions, setStageOptions] = useState<StageOption[]>([]);
-  const [filter, setFilter] = useState<"all" | "pending" | "active" | "new" | "advanced">("all");
+  const [filter, setFilter] = useState<AdminFilter>("all");
   const [search, setSearch] = useState("");
   const isAdmin = isAdminEmail(session?.email);
   const analytics = useMemo(() => getAdminAnalytics(rows), [rows]);
@@ -139,6 +150,22 @@ export default function AdminPage() {
 
     if (filter === "advanced") {
       return [...searchedRows].sort((left, right) => right.player.level - left.player.level);
+    }
+
+    if (filter === "shopLocked") {
+      return searchedRows.filter((row) => row.player.inventory.rewardsLocked);
+    }
+
+    if (filter === "gifted") {
+      return searchedRows.filter((row) => (row.player.giftNotifications ?? []).length > 0);
+    }
+
+    if (filter === "noAttempts") {
+      return searchedRows.filter((row) => row.attempts.length === 0);
+    }
+
+    if (filter === "recentErrors") {
+      return searchedRows.filter((row) => row.attempts.some((attempt) => !attempt.success));
     }
 
     return searchedRows;
@@ -364,6 +391,43 @@ export default function AdminPage() {
     }
   }
 
+  async function toggleFocusGuard() {
+    if (!session || !appSettings) {
+      return;
+    }
+
+    const nextFocusGuardEnabled = !appSettings.focusGuardEnabled;
+
+    try {
+      const response = await fetch(
+        "/api/admin/app-settings",
+        {
+          method: "PATCH",
+          headers: {
+            ...getAdminRequestHeaders(session),
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            focusGuardEnabled: nextFocusGuardEnabled,
+          }),
+        }
+      );
+      const data = await response.json() as AppSettingsSummary & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Nao foi possivel alterar modo foco.");
+      }
+
+      setAppSettings(data);
+      setMessage(data.focusGuardEnabled
+        ? "Modo foco ativado nas fases."
+        : "Modo foco desativado nas fases.");
+      await loadAudit();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Erro ao alterar modo foco.");
+    }
+  }
+
   if (!session) {
     return (
       <main className="cq-page">
@@ -470,6 +534,33 @@ export default function AdminPage() {
             >
               {appSettings?.maintenanceMode ? "Desativar manutencao" : "Ativar manutencao"}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nextFocusGuardEnabled = !appSettings?.focusGuardEnabled;
+
+                setConfirmRequest({
+                  title: nextFocusGuardEnabled ? "Ativar modo foco" : "Desativar modo foco",
+                  message: nextFocusGuardEnabled
+                    ? "As fases vao pausar quando o aluno trocar de aba, perder foco ou tentar colar texto."
+                    : "As fases deixam de pausar por troca de aba, perda de foco ou colagem.",
+                  confirmLabel: nextFocusGuardEnabled ? "Ativar" : "Desativar",
+                  danger: !nextFocusGuardEnabled,
+                  onConfirm: () => {
+                    void toggleFocusGuard();
+                  },
+                });
+              }}
+              disabled={!appSettings}
+              className={[
+                "cq-button cq-button-secondary",
+                appSettings?.focusGuardEnabled
+                  ? "border-[#72e6a8]/45 text-[#b8ffd8]"
+                  : "border-yellow-300/50 text-yellow-100",
+              ].join(" ")}
+            >
+              {appSettings?.focusGuardEnabled ? "Modo foco ativo" : "Modo foco desligado"}
+            </button>
             <button type="button" onClick={loadRows} className="cq-button cq-button-secondary">
               Atualizar
             </button>
@@ -504,6 +595,9 @@ export default function AdminPage() {
                 Manutencao: {appSettings.maintenanceMode ? "ativa" : "desativada"}
                 {appSettings.envForced ? " (forcada por env)" : ""}
               </span>
+              <span>
+                Modo foco: {appSettings.focusGuardEnabled ? "ativo" : "desativado"}
+              </span>
               {appSettings.updatedAt && (
                 <span className="text-[#93a4bd]">
                   Atualizado por {appSettings.updatedBy ?? "admin"} em {formatDate(appSettings.updatedAt)}
@@ -537,6 +631,10 @@ export default function AdminPage() {
             ["active", "Com progresso"],
             ["new", "Sem progresso"],
             ["advanced", "Mais avancados"],
+            ["shopLocked", "Loja bloqueada"],
+            ["gifted", "Com presente"],
+            ["noAttempts", "Sem tentativas"],
+            ["recentErrors", "Com erro recente"],
           ].map(([value, label]) => (
             <button
               key={value}

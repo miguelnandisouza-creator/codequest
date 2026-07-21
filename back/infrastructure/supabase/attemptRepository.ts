@@ -51,7 +51,7 @@ export async function recordAttempt(attempt: AttemptRecord) {
 }
 
 export async function readRecentAttempts(userId?: string, limit = 30) {
-  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const safeLimit = Math.min(Math.max(limit, 1), 1000);
   const supabase = getSupabaseServerClient();
 
   if (supabase) {
