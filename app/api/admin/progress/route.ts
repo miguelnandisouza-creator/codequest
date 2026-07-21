@@ -1,7 +1,8 @@
 import { rewardItems } from "@/data/rewards";
 import { campaigns } from "@/data/campaigns";
 import { readStoredUsers, resetStoredUserPassword, updateStoredUserName } from "@/infrastructure/auth/userStore";
-import { isAdminSessionRequest } from "@/infrastructure/auth/sessionToken";
+import { getSessionRequestPayload, isAdminSessionRequest } from "@/infrastructure/auth/sessionToken";
+import { recordAdminAction } from "@/infrastructure/admin/adminAuditRepository";
 import { readRecentAttempts } from "@/infrastructure/supabase/attemptRepository";
 import {
   readProgressSnapshots,
@@ -10,6 +11,20 @@ import {
   writePlayerProgress,
 } from "@/infrastructure/supabase/playerProgressRepository";
 import { initialPlayer } from "@/domain/game/playerProgress";
+
+type AdminProgressAction =
+  | "update"
+  | "reset"
+  | "resetProgress"
+  | "resetAllProgress"
+  | "grantReward"
+  | "equipReward"
+  | "giftReward"
+  | "toggleRewardsLock"
+  | "assignSurpriseExam"
+  | "clearSurpriseExam"
+  | "restoreSnapshot"
+  | "resetPassword";
 
 export async function GET(request: Request) {
   if (!isAdminSessionRequest(request)) {
@@ -38,7 +53,7 @@ export async function PATCH(request: Request) {
     level?: number;
     name?: string;
     stageId?: string;
-    action?: "update" | "reset" | "resetProgress" | "resetAllProgress" | "grantReward" | "equipReward" | "giftReward" | "toggleRewardsLock" | "assignSurpriseExam" | "clearSurpriseExam" | "restoreSnapshot" | "resetPassword";
+    action?: AdminProgressAction;
     password?: string;
     rewardId?: string;
     snapshotId?: string;
@@ -51,6 +66,7 @@ export async function PATCH(request: Request) {
       rewardCoins?: number;
     };
   } | null;
+  const actorEmail = getSessionRequestPayload(request)?.email ?? "admin";
 
   if (body?.action === "resetAllProgress") {
     const users = await readStoredUsers();
@@ -76,6 +92,12 @@ export async function PATCH(request: Request) {
         { forceOverwrite: true }
       );
     }));
+    await recordAdminAction({
+      action: "resetAllProgress",
+      label: "Resetou campanha de todos",
+      actorEmail,
+      details: `${users.length} usuario(s) voltaram ao inicio mantendo itens liberados.`,
+    });
 
     const rows = await Promise.all(users.map(async (user) => ({
       user,
@@ -93,6 +115,8 @@ export async function PATCH(request: Request) {
 
   const player = await readPlayerProgress(body.userId);
   const action = body.action ?? "update";
+  const usersBeforeChange = await readStoredUsers();
+  const targetUser = usersBeforeChange.find((storedUser) => storedUser.id === body.userId);
 
   if (body.name !== undefined) {
     await updateStoredUserName(body.userId, body.name);
@@ -105,6 +129,14 @@ export async function PATCH(request: Request) {
 
     await resetStoredUserPassword(body.userId, body.password);
     const user = (await readStoredUsers()).find((storedUser) => storedUser.id === body.userId);
+    await recordAdminAction({
+      action,
+      label: "Redefiniu senha",
+      actorEmail,
+      targetUserId: body.userId,
+      targetName: user?.name ?? targetUser?.name,
+      targetEmail: user?.email ?? targetUser?.email,
+    });
 
     return Response.json({
       player,
@@ -121,6 +153,15 @@ export async function PATCH(request: Request) {
 
     const restoredPlayer = await restoreProgressSnapshot(body.userId, body.snapshotId);
     const user = (await readStoredUsers()).find((storedUser) => storedUser.id === body.userId);
+    await recordAdminAction({
+      action,
+      label: "Restaurou backup",
+      actorEmail,
+      targetUserId: body.userId,
+      targetName: user?.name ?? targetUser?.name,
+      targetEmail: user?.email ?? targetUser?.email,
+      details: `Backup ${body.snapshotId} restaurado.`,
+    });
 
     return Response.json({
       player: restoredPlayer,
@@ -286,6 +327,15 @@ export async function PATCH(request: Request) {
   );
 
   const user = (await readStoredUsers()).find((storedUser) => storedUser.id === body.userId);
+  await recordAdminAction({
+    action,
+    label: getAuditLabel(action, body),
+    actorEmail,
+    targetUserId: body.userId,
+    targetName: user?.name ?? targetUser?.name,
+    targetEmail: user?.email ?? targetUser?.email,
+    details: getAuditDetails(action, body, player, savedPlayer),
+  });
 
   return Response.json({
     player: savedPlayer,
@@ -293,6 +343,87 @@ export async function PATCH(request: Request) {
     attempts: await readRecentAttempts(body.userId, 8),
     snapshots: await readProgressSnapshots(body.userId, 8),
   });
+}
+
+function getAuditLabel(
+  action: AdminProgressAction,
+  body: {
+    name?: string;
+    coins?: number;
+    level?: number;
+    stageId?: string;
+    rewardId?: string;
+  }
+) {
+  if (action === "grantReward") return "Liberou recompensa";
+  if (action === "equipReward") return "Equipou recompensa";
+  if (action === "giftReward") return "Enviou presente";
+  if (action === "toggleRewardsLock") return "Alterou bloqueio da loja";
+  if (action === "assignSurpriseExam") return "Enviou prova surpresa";
+  if (action === "clearSurpriseExam") return "Limpou prova pendente";
+  if (action === "resetProgress") return "Resetou campanha";
+  if (action === "reset") return "Resetou conta inteira";
+
+  if (body.stageId) return "Alterou fase atual";
+  if (body.name !== undefined || body.coins !== undefined || body.level !== undefined) {
+    return "Atualizou dados do aluno";
+  }
+
+  return "Atualizou progresso";
+}
+
+function getAuditDetails(
+  action: AdminProgressAction,
+  body: {
+    name?: string;
+    coins?: number;
+    level?: number;
+    stageId?: string;
+    rewardId?: string;
+    surpriseExam?: { title?: string };
+  },
+  previousPlayer: Awaited<ReturnType<typeof readPlayerProgress>>,
+  savedPlayer: Awaited<ReturnType<typeof readPlayerProgress>>
+) {
+  if (body.rewardId) {
+    const reward = rewardItems.find((item) => item.id === body.rewardId);
+
+    return reward ? `${reward.name} (${reward.kind}).` : `Recompensa ${body.rewardId}.`;
+  }
+
+  if (body.stageId) {
+    const stage = getStageOptions().find((item) => item.id === body.stageId);
+
+    return stage ? `Fase atual: ${stage.campaignTitle} / ${stage.chapterTitle} / ${stage.title}.` : `Fase ${body.stageId}.`;
+  }
+
+  if (action === "toggleRewardsLock") {
+    return savedPlayer.inventory.rewardsLocked ? "Loja bloqueada." : "Loja desbloqueada.";
+  }
+
+  if (action === "assignSurpriseExam") {
+    return `Prova: ${body.surpriseExam?.title ?? "sem titulo"}.`;
+  }
+
+  if (action === "clearSurpriseExam") {
+    return "Prova pendente removida.";
+  }
+
+  if (action === "resetProgress") {
+    return "Campanha voltou ao inicio mantendo itens liberados.";
+  }
+
+  if (action === "reset") {
+    return "Conta voltou ao estado inicial completo.";
+  }
+
+  const changes = [
+    body.name !== undefined ? `nome alterado` : "",
+    previousPlayer.coins !== savedPlayer.coins ? `moedas ${previousPlayer.coins} -> ${savedPlayer.coins}` : "",
+    previousPlayer.level !== savedPlayer.level ? `nivel ${previousPlayer.level} -> ${savedPlayer.level}` : "",
+  ].filter(Boolean);
+
+  return changes.length > 0 ? `${changes.join(", ")}.` : undefined;
 }
 
 function getStageOptions() {

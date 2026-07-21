@@ -65,6 +65,18 @@ type AppSettingsSummary = {
   updatedBy?: string;
 };
 
+type AdminAuditRecord = {
+  id: string;
+  action: string;
+  label: string;
+  actorEmail: string;
+  targetUserId?: string;
+  targetName?: string;
+  targetEmail?: string;
+  details?: string;
+  createdAt: string;
+};
+
 type StageOption = {
   id: string;
   title: string;
@@ -97,6 +109,7 @@ export default function AdminPage() {
   const [storageMode, setStorageMode] = useState<"local" | "supabase" | "">("");
   const [appSettings, setAppSettings] = useState<AppSettingsSummary | null>(null);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const [auditLog, setAuditLog] = useState<AdminAuditRecord[]>([]);
   const [stageOptions, setStageOptions] = useState<StageOption[]>([]);
   const [filter, setFilter] = useState<"all" | "pending" | "active" | "new" | "advanced">("all");
   const [search, setSearch] = useState("");
@@ -131,6 +144,27 @@ export default function AdminPage() {
     return searchedRows;
   }, [filter, rows, search]);
 
+  const loadAudit = useCallback(async () => {
+    if (!session) {
+      return;
+    }
+
+    const response = await fetch(
+      "/api/admin/audit",
+      {
+        cache: "no-store",
+        headers: getAdminRequestHeaders(session),
+      }
+    );
+    const data = await response.json() as { auditLog?: AdminAuditRecord[]; error?: string };
+
+    if (!response.ok) {
+      throw new Error(data.error ?? "Nao foi possivel carregar historico admin.");
+    }
+
+    setAuditLog(data.auditLog ?? []);
+  }, [session]);
+
   const loadRows = useCallback(async () => {
     if (!session) {
       return;
@@ -161,18 +195,31 @@ export default function AdminPage() {
           headers: getAdminRequestHeaders(session),
         }
       );
+      const auditResponse = await fetch(
+        "/api/admin/audit",
+        {
+          cache: "no-store",
+          headers: getAdminRequestHeaders(session),
+        }
+      );
       const data = await response.json() as { rows?: AdminRow[]; stageOptions?: StageOption[]; error?: string };
       const storageData = await storageResponse.json() as { mode?: "local" | "supabase" };
       const settingsData = await settingsResponse.json() as AppSettingsSummary & { error?: string };
+      const auditData = await auditResponse.json() as { auditLog?: AdminAuditRecord[]; error?: string };
 
       if (!response.ok) {
         throw new Error(data.error ?? "Nao foi possivel carregar usuarios.");
+      }
+
+      if (!auditResponse.ok) {
+        throw new Error(auditData.error ?? "Nao foi possivel carregar historico admin.");
       }
 
       setRows(data.rows ?? []);
       setStageOptions(data.stageOptions ?? []);
       setStorageMode(storageData.mode ?? "");
       setAppSettings(settingsResponse.ok ? settingsData : null);
+      setAuditLog(auditData.auditLog ?? []);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erro ao carregar painel.");
     } finally {
@@ -232,6 +279,9 @@ export default function AdminPage() {
         : row
     )));
     setMessage(getAdminSuccessMessage(patch, data.user?.name));
+    void loadAudit().catch((error) => {
+      setMessage(error instanceof Error ? error.message : "Progresso atualizado, mas o historico nao recarregou.");
+    });
   }
 
   async function resetAllProgress() {
@@ -269,6 +319,7 @@ export default function AdminPage() {
       setRows(data.rows);
       setStageOptions(data.stageOptions ?? stageOptions);
       setMessage("Campanha resetada para todos os usuarios.");
+      await loadAudit();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erro ao resetar todos.");
     } finally {
@@ -307,6 +358,7 @@ export default function AdminPage() {
       setMessage(data.maintenanceMode
         ? "Modo manutencao ativado para alunos."
         : "Modo manutencao desativado.");
+      await loadAudit();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erro ao alterar manutencao.");
     }
@@ -476,6 +528,8 @@ export default function AdminPage() {
           <AdminStat label="Top aluno" value={analytics.topUser} compact />
         </div>
 
+        <AdminAuditLog records={auditLog} />
+
         <div className="mt-6 flex flex-wrap gap-3">
           {[
             ["all", "Todos"],
@@ -601,6 +655,55 @@ function ConfirmDialog({
         </div>
       </section>
     </div>
+  );
+}
+
+function AdminAuditLog({ records }: { records: AdminAuditRecord[] }) {
+  const visibleRecords = records.slice(0, 8);
+
+  return (
+    <section className="cq-panel mt-8 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="cq-kicker">Historico admin</p>
+          <h2 className="cq-title mt-2 text-2xl">Ultimas acoes</h2>
+        </div>
+        <span className="cq-badge">{records.length} registros</span>
+      </div>
+
+      <div className="mt-5 grid gap-3">
+        {visibleRecords.length === 0 ? (
+          <p className="text-sm text-[#93a4bd]">
+            Nenhuma acao administrativa registrada ainda.
+          </p>
+        ) : visibleRecords.map((record) => (
+          <article key={record.id} className="rounded border border-[#26384f] bg-[#07101d] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-sm font-black text-[#f3f7ff]">
+                  {record.label}
+                </p>
+                <p className="mt-1 text-xs text-[#93a4bd]">
+                  {record.targetName || record.targetEmail
+                    ? `${record.targetName ?? "Aluno"} ${record.targetEmail ? `(${record.targetEmail})` : ""}`
+                    : "Acao global"}
+                </p>
+              </div>
+              <span className="cq-badge">{formatDate(record.createdAt)}</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#93a4bd]">
+              <span>Por {record.actorEmail}</span>
+              <span>Tipo: {record.action}</span>
+            </div>
+            {record.details && (
+              <p className="mt-3 text-sm leading-6 text-[#c8d3e3]">
+                {record.details}
+              </p>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 

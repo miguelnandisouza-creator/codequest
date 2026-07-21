@@ -6,6 +6,7 @@ import {
   getSessionRequestPayload,
   isAdminSessionRequest,
 } from "@/infrastructure/auth/sessionToken";
+import { recordAdminAction } from "@/infrastructure/admin/adminAuditRepository";
 
 export async function GET(request: Request) {
   if (!isAdminSessionRequest(request)) {
@@ -39,6 +40,14 @@ export async function PATCH(request: Request) {
     { maintenanceMode: body.maintenanceMode },
     session?.email ?? "admin"
   );
+  await recordAdminAction({
+    action: "maintenanceMode",
+    label: settings.maintenanceMode ? "Ativou manutencao" : "Desativou manutencao",
+    actorEmail: session?.email ?? "admin",
+    details: settings.maintenanceMode
+      ? "Alunos passam a ver a tela de manutencao."
+      : "Site liberado para alunos.",
+  });
 
   return Response.json(settings);
 }
