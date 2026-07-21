@@ -28,6 +28,7 @@ type AdminProgressPatch = {
   stageId?: string;
   action?: string;
   password?: string;
+  requestId?: string;
   rewardId?: string;
   snapshotId?: string;
   surpriseExam?: {
@@ -78,6 +79,18 @@ type AdminAuditRecord = {
   createdAt: string;
 };
 
+type PasswordResetRequest = {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  requestedPassword: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+};
+
 type StageOption = {
   id: string;
   title: string;
@@ -121,6 +134,7 @@ export default function AdminPage() {
   const [appSettings, setAppSettings] = useState<AppSettingsSummary | null>(null);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [auditLog, setAuditLog] = useState<AdminAuditRecord[]>([]);
+  const [passwordResetRequests, setPasswordResetRequests] = useState<PasswordResetRequest[]>([]);
   const [stageOptions, setStageOptions] = useState<StageOption[]>([]);
   const [filter, setFilter] = useState<AdminFilter>("all");
   const [search, setSearch] = useState("");
@@ -229,7 +243,12 @@ export default function AdminPage() {
           headers: getAdminRequestHeaders(session),
         }
       );
-      const data = await response.json() as { rows?: AdminRow[]; stageOptions?: StageOption[]; error?: string };
+      const data = await response.json() as {
+        rows?: AdminRow[];
+        stageOptions?: StageOption[];
+        passwordResetRequests?: PasswordResetRequest[];
+        error?: string;
+      };
       const storageData = await storageResponse.json() as { mode?: "local" | "supabase" };
       const settingsData = await settingsResponse.json() as AppSettingsSummary & { error?: string };
       const auditData = await auditResponse.json() as { auditLog?: AdminAuditRecord[]; error?: string };
@@ -244,6 +263,7 @@ export default function AdminPage() {
 
       setRows(data.rows ?? []);
       setStageOptions(data.stageOptions ?? []);
+      setPasswordResetRequests(data.passwordResetRequests ?? []);
       setStorageMode(storageData.mode ?? "");
       setAppSettings(settingsResponse.ok ? settingsData : null);
       setAuditLog(auditData.auditLog ?? []);
@@ -286,6 +306,7 @@ export default function AdminPage() {
       user?: LocalUser;
       attempts?: AttemptSummary[];
       snapshots?: ProgressSnapshotSummary[];
+      passwordResetRequests?: PasswordResetRequest[];
       error?: string;
     };
 
@@ -305,6 +326,7 @@ export default function AdminPage() {
         }
         : row
     )));
+    setPasswordResetRequests(data.passwordResetRequests ?? passwordResetRequests);
     setMessage(getAdminSuccessMessage(patch, data.user?.name));
     void loadAudit().catch((error) => {
       setMessage(error instanceof Error ? error.message : "Progresso atualizado, mas o historico nao recarregou.");
@@ -336,6 +358,7 @@ export default function AdminPage() {
       const data = await response.json() as {
         rows?: AdminRow[];
         stageOptions?: StageOption[];
+        passwordResetRequests?: PasswordResetRequest[];
         error?: string;
       };
 
@@ -345,6 +368,7 @@ export default function AdminPage() {
 
       setRows(data.rows);
       setStageOptions(data.stageOptions ?? stageOptions);
+      setPasswordResetRequests(data.passwordResetRequests ?? passwordResetRequests);
       setMessage("Campanha resetada para todos os usuarios.");
       await loadAudit();
     } catch (error) {
@@ -617,10 +641,37 @@ export default function AdminPage() {
           <AdminStat label="Usuarios" value={analytics.totalUsers} />
           <AdminStat label="Ativos" value={analytics.activeUsers} />
           <AdminStat label="Provas" value={analytics.pendingExams} />
+          <AdminStat label="Senha" value={passwordResetRequests.filter((request) => request.status === "pending").length} />
           <AdminStat label="Nivel medio" value={analytics.averageLevel} />
           <AdminStat label="Fases" value={analytics.totalCompletedStages} />
-          <AdminStat label="Top aluno" value={analytics.topUser} compact />
         </div>
+
+        <PasswordResetQueue
+          requests={passwordResetRequests}
+          onApprove={(request) => setConfirmRequest({
+            title: "Aprovar troca de senha",
+            message: `Trocar a senha de ${request.name} para a senha solicitada?`,
+            confirmLabel: "Aprovar",
+            danger: true,
+            onConfirm: () => {
+              void updateProgress(request.userId, {
+                action: "approvePasswordResetRequest",
+                requestId: request.id,
+              });
+            },
+          })}
+          onReject={(request) => setConfirmRequest({
+            title: "Recusar troca de senha",
+            message: `Recusar o pedido de troca de senha de ${request.name}?`,
+            confirmLabel: "Recusar",
+            onConfirm: () => {
+              void updateProgress(request.userId, {
+                action: "rejectPasswordResetRequest",
+                requestId: request.id,
+              });
+            },
+          })}
+        />
 
         <AdminAuditLog records={auditLog} />
 
@@ -709,6 +760,82 @@ function AdminStat({
         {value}
       </p>
     </div>
+  );
+}
+
+function PasswordResetQueue({
+  requests,
+  onApprove,
+  onReject,
+}: {
+  requests: PasswordResetRequest[];
+  onApprove: (request: PasswordResetRequest) => void;
+  onReject: (request: PasswordResetRequest) => void;
+}) {
+  const pendingRequests = requests.filter((request) => request.status === "pending");
+
+  if (pendingRequests.length === 0) {
+    return (
+      <div className="cq-panel mt-6 p-4 text-sm text-[#93a4bd]">
+        Nenhuma solicitacao de troca de senha pendente.
+      </div>
+    );
+  }
+
+  return (
+    <section className="cq-panel mt-6 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="cq-kicker">Troca de senha</p>
+          <h2 className="cq-title mt-2 text-2xl">Pedidos dos alunos</h2>
+        </div>
+        <span className="cq-badge">{pendingRequests.length} pendente(s)</span>
+      </div>
+
+      <div className="mt-5 grid gap-3">
+        {pendingRequests.map((request) => (
+          <article
+            key={request.id}
+            className="rounded border border-[#26384f] bg-[#0b1424] p-4"
+          >
+            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-mono text-lg font-black text-[#f3f7ff]">
+                    {request.name}
+                  </h3>
+                  <span className="cq-badge">{request.email}</span>
+                  <span className="cq-badge">{formatDate(request.createdAt)}</span>
+                </div>
+                <div className="mt-3 grid gap-2 text-sm text-[#93a4bd] sm:grid-cols-[auto_1fr] sm:items-center">
+                  <span>Senha solicitada</span>
+                  <code className="break-all rounded border border-[#6f91d8]/35 bg-[#060913] px-3 py-2 font-mono text-[#cfe0ff]">
+                    {request.requestedPassword}
+                  </code>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                <button
+                  type="button"
+                  onClick={() => onApprove(request)}
+                  className="cq-button"
+                >
+                  Aprovar troca
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onReject(request)}
+                  className="cq-button cq-button-secondary"
+                >
+                  Recusar
+                </button>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1573,6 +1700,14 @@ function getAdminSuccessMessage(patch: AdminProgressPatch, userName?: string) {
 
   if (patch.action === "resetPassword") {
     return `Senha de ${userName ?? "usuario"} redefinida.`;
+  }
+
+  if (patch.action === "approvePasswordResetRequest") {
+    return `Troca de senha de ${userName ?? "usuario"} aprovada.`;
+  }
+
+  if (patch.action === "rejectPasswordResetRequest") {
+    return `Troca de senha de ${userName ?? "usuario"} recusada.`;
   }
 
   return "Progresso atualizado.";

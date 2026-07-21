@@ -2,6 +2,10 @@ import { rewardItems } from "@/data/rewards";
 import { campaigns } from "@/data/campaigns";
 import { readStoredUsers, resetStoredUserPassword, updateStoredUserName } from "@/infrastructure/auth/userStore";
 import { getSessionRequestPayload, isAdminSessionRequest } from "@/infrastructure/auth/sessionToken";
+import {
+  readPasswordResetRequests,
+  resolvePasswordResetRequest,
+} from "@/infrastructure/auth/passwordResetRequests";
 import { recordAdminAction } from "@/infrastructure/admin/adminAuditRepository";
 import { readRecentAttempts } from "@/infrastructure/supabase/attemptRepository";
 import {
@@ -24,7 +28,9 @@ type AdminProgressAction =
   | "assignSurpriseExam"
   | "clearSurpriseExam"
   | "restoreSnapshot"
-  | "resetPassword";
+  | "resetPassword"
+  | "approvePasswordResetRequest"
+  | "rejectPasswordResetRequest";
 
 export async function GET(request: Request) {
   if (!isAdminSessionRequest(request)) {
@@ -39,7 +45,11 @@ export async function GET(request: Request) {
     snapshots: await readProgressSnapshots(user.id, 8),
   })));
 
-  return Response.json({ rows, stageOptions: getStageOptions() });
+  return Response.json({
+    rows,
+    stageOptions: getStageOptions(),
+    passwordResetRequests: await readPasswordResetRequests(),
+  });
 }
 
 export async function PATCH(request: Request) {
@@ -55,6 +65,7 @@ export async function PATCH(request: Request) {
     stageId?: string;
     action?: AdminProgressAction;
     password?: string;
+    requestId?: string;
     rewardId?: string;
     snapshotId?: string;
     surpriseExam?: {
@@ -106,7 +117,11 @@ export async function PATCH(request: Request) {
       snapshots: await readProgressSnapshots(user.id, 8),
     })));
 
-    return Response.json({ rows, stageOptions: getStageOptions() });
+    return Response.json({
+      rows,
+      stageOptions: getStageOptions(),
+      passwordResetRequests: await readPasswordResetRequests(),
+    });
   }
 
   if (!body?.userId) {
@@ -143,6 +158,43 @@ export async function PATCH(request: Request) {
       user,
       attempts: await readRecentAttempts(body.userId, 8),
       snapshots: await readProgressSnapshots(body.userId, 8),
+      passwordResetRequests: await readPasswordResetRequests(),
+    });
+  }
+
+  if (action === "approvePasswordResetRequest" || action === "rejectPasswordResetRequest") {
+    if (!body.requestId) {
+      return Response.json({ error: "Solicitacao de senha nao informada." }, { status: 400 });
+    }
+
+    const requestStatus = action === "approvePasswordResetRequest" ? "approved" : "rejected";
+    const passwordRequest = await resolvePasswordResetRequest(body.requestId, requestStatus, actorEmail);
+
+    if (passwordRequest.userId !== body.userId) {
+      return Response.json({ error: "Solicitacao nao pertence a este usuario." }, { status: 400 });
+    }
+
+    if (requestStatus === "approved") {
+      await resetStoredUserPassword(body.userId, passwordRequest.requestedPassword);
+    }
+
+    const user = (await readStoredUsers()).find((storedUser) => storedUser.id === body.userId);
+    await recordAdminAction({
+      action,
+      label: requestStatus === "approved" ? "Aprovou troca de senha" : "Recusou troca de senha",
+      actorEmail,
+      targetUserId: body.userId,
+      targetName: user?.name ?? targetUser?.name,
+      targetEmail: user?.email ?? targetUser?.email,
+      details: `Solicitacao ${body.requestId} ${requestStatus === "approved" ? "aprovada" : "recusada"}.`,
+    });
+
+    return Response.json({
+      player,
+      user,
+      attempts: await readRecentAttempts(body.userId, 8),
+      snapshots: await readProgressSnapshots(body.userId, 8),
+      passwordResetRequests: await readPasswordResetRequests(),
     });
   }
 
@@ -342,6 +394,7 @@ export async function PATCH(request: Request) {
     user,
     attempts: await readRecentAttempts(body.userId, 8),
     snapshots: await readProgressSnapshots(body.userId, 8),
+    passwordResetRequests: await readPasswordResetRequests(),
   });
 }
 

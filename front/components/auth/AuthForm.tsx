@@ -6,10 +6,12 @@ import { useState } from "react";
 type Props = {
   mode: "login" | "register";
   errorMessage?: string;
+  resetMessage?: string;
 };
 
-export default function AuthForm({ mode, errorMessage }: Props) {
+export default function AuthForm({ mode, errorMessage, resetMessage }: Props) {
   const isRegister = mode === "register";
+  const [showResetRequest, setShowResetRequest] = useState(false);
 
   return (
     <div className="cq-panel p-6 md:p-8">
@@ -53,6 +55,12 @@ export default function AuthForm({ mode, errorMessage }: Props) {
       {errorMessage && (
         <div className="mt-6 rounded-md border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-100">
           {errorMessage}
+        </div>
+      )}
+
+      {resetMessage && (
+        <div className="mt-6 rounded-md border border-[#72e6a8]/40 bg-[#72e6a8]/10 px-4 py-3 text-sm leading-6 text-[#b8ffd8]">
+          {resetMessage}
         </div>
       )}
 
@@ -110,11 +118,67 @@ export default function AuthForm({ mode, errorMessage }: Props) {
             {isRegister ? "Registrar conta" : "Entrar na conta"}
           </button>
 
+          {!isRegister && (
+            <button
+              type="button"
+              onClick={() => setShowResetRequest((current) => !current)}
+              className="cq-button cq-button-secondary"
+            >
+              Esqueci minha senha
+            </button>
+          )}
+
           <Link href="/" className="cq-button cq-button-secondary">
             Voltar
           </Link>
         </div>
       </form>
+
+      {!isRegister && showResetRequest && (
+        <form
+          action="/api/auth/password-reset-request"
+          method="post"
+          className="cq-panel mt-6 border-[#6f91d8]/45 p-4"
+        >
+          <p className="cq-kicker">Solicitar troca</p>
+          <p className="mt-2 text-sm leading-6 text-[#93a4bd]">
+            O admin recebe seu pedido e decide se troca a senha.
+          </p>
+
+          <label className="mt-4 block">
+            <span className="mb-2 block font-mono text-xs font-bold uppercase tracking-[0.1em] text-[#9ec0ff]">
+              Email da conta
+            </span>
+            <input
+              name="email"
+              className="w-full rounded-md border border-[#26384f] bg-[#07101d] px-4 py-3 text-white outline-none focus:border-[#5b8cff]"
+              placeholder="voce@email.com"
+              type="email"
+              autoComplete="email"
+              required
+            />
+          </label>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <PasswordField
+              name="requestedPassword"
+              label="Senha desejada"
+              placeholder="Minimo 6 caracteres"
+              autoComplete="new-password"
+            />
+            <PasswordField
+              name="confirmPassword"
+              label="Confirmar senha"
+              placeholder="Repita a senha desejada"
+              autoComplete="new-password"
+            />
+          </div>
+
+          <button type="submit" className="cq-button mt-4">
+            Enviar pedido
+          </button>
+        </form>
+      )}
     </div>
   );
 }
