@@ -12,6 +12,7 @@ import {
 } from "@/domain/game/progression";
 import ChallengeStep from "./ChallengeStep";
 import ExampleStep from "./ExampleStep";
+import FocusGuard from "./FocusGuard";
 import LearningNotebook from "./LearningNotebook";
 import Link from "next/link";
 import PixelScene from "./PixelScene";
@@ -96,6 +97,11 @@ export default function AdventureEngine({
 
   return (
     <div className="mx-auto max-w-6xl">
+      <FocusGuard
+        active={unlocked && !completed}
+        stageTitle={stage.title}
+      />
+
       {unlocked && !completed && (
         <LearningNotebook
           stage={stage}
