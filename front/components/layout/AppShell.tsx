@@ -35,7 +35,7 @@ export default function AppShell({ children, maintenanceMode = false }: Props) {
   const session = useMemo(() => parseJson<LocalSession>(sessionSnapshot), [sessionSnapshot]);
   const isAdmin = isAdminEmail(session?.email);
   const canBypassMaintenance = isAdmin || pathname === "/login" || pathname === "/admin";
-  const activeMaintenanceMode = remoteMaintenanceMode || maintenanceMode;
+  const activeMaintenanceMode = remoteMaintenanceMode;
 
   useEffect(() => {
     let cancelled = false;
