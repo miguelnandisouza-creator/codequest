@@ -59,7 +59,7 @@ export function isAdminSessionRequest(request: Request) {
     return true;
   }
 
-  if (process.env.VERCEL === "1") {
+  if (process.env.VERCEL === "1" || process.env.NODE_ENV === "production") {
     return false;
   }
 
@@ -85,12 +85,17 @@ function sign(value: string) {
 }
 
 function getSessionSecret() {
-  return (
-    process.env.CODEQUEST_SESSION_SECRET ??
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.NEXTAUTH_SECRET ??
-    "codequest-local-dev-session-secret"
-  );
+  const configuredSecret = process.env.CODEQUEST_SESSION_SECRET;
+
+  if (configuredSecret) {
+    return configuredSecret;
+  }
+
+  if (process.env.VERCEL === "1" || process.env.NODE_ENV === "production") {
+    throw new Error("CODEQUEST_SESSION_SECRET is required in production.");
+  }
+
+  return "codequest-local-dev-session-secret";
 }
 
 function encodeBase64Url(value: string) {
