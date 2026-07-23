@@ -8,6 +8,7 @@ import {
   getServerLocalSessionSnapshot,
   LocalSession,
   LocalUser,
+  logoutLocalUser,
   subscribeToLocalAuth,
 } from "@/application/auth/localAuth";
 import { isAdminEmail } from "@/data/admin";
@@ -120,6 +121,8 @@ type ConfirmRequest = {
   onConfirm: () => void;
 };
 
+const adminSessionExpiredMessage = "Sessao admin expirada depois da atualizacao de seguranca. Entre de novo para liberar o painel.";
+
 export default function AdminPage() {
   const sessionSnapshot = useSyncExternalStore(
     subscribeToLocalAuth,
@@ -185,6 +188,17 @@ export default function AdminPage() {
     return searchedRows;
   }, [filter, rows, search]);
 
+  const handleAdminForbidden = useCallback(() => {
+    setRows([]);
+    setAuditLog([]);
+    setPasswordResetRequests([]);
+    setStageOptions([]);
+    setAppSettings(null);
+    setStorageMode("");
+    setMessage(adminSessionExpiredMessage);
+    logoutLocalUser();
+  }, []);
+
   const loadAudit = useCallback(async () => {
     if (!session) {
       return;
@@ -199,12 +213,17 @@ export default function AdminPage() {
     );
     const data = await response.json() as { auditLog?: AdminAuditRecord[]; error?: string };
 
+    if (response.status === 403) {
+      handleAdminForbidden();
+      throw new Error(adminSessionExpiredMessage);
+    }
+
     if (!response.ok) {
       throw new Error(data.error ?? "Nao foi possivel carregar historico admin.");
     }
 
     setAuditLog(data.auditLog ?? []);
-  }, [session]);
+  }, [handleAdminForbidden, session]);
 
   const loadRows = useCallback(async () => {
     if (!session) {
@@ -243,6 +262,17 @@ export default function AdminPage() {
           headers: getAdminRequestHeaders(session),
         }
       );
+
+      if (
+        response.status === 403 ||
+        storageResponse.status === 403 ||
+        settingsResponse.status === 403 ||
+        auditResponse.status === 403
+      ) {
+        handleAdminForbidden();
+        return;
+      }
+
       const data = await response.json() as {
         rows?: AdminRow[];
         stageOptions?: StageOption[];
@@ -272,7 +302,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [session]);
+  }, [handleAdminForbidden, session]);
 
   useEffect(() => {
     if (session && isAdmin) {
@@ -301,6 +331,12 @@ export default function AdminPage() {
         }),
       }
     );
+
+    if (response.status === 403) {
+      handleAdminForbidden();
+      return;
+    }
+
     const data = await response.json() as {
       player?: Player;
       user?: LocalUser;
@@ -353,8 +389,14 @@ export default function AdminPage() {
           body: JSON.stringify({
             action: "resetAllProgress",
           }),
-        }
-      );
+      }
+    );
+
+      if (response.status === 403) {
+        handleAdminForbidden();
+        return;
+      }
+
       const data = await response.json() as {
         rows?: AdminRow[];
         stageOptions?: StageOption[];
@@ -399,6 +441,12 @@ export default function AdminPage() {
           }),
         }
       );
+
+      if (response.status === 403) {
+        handleAdminForbidden();
+        return;
+      }
+
       const data = await response.json() as AppSettingsSummary & { error?: string };
 
       if (!response.ok) {
@@ -436,6 +484,12 @@ export default function AdminPage() {
           }),
         }
       );
+
+      if (response.status === 403) {
+        handleAdminForbidden();
+        return;
+      }
+
       const data = await response.json() as AppSettingsSummary & { error?: string };
 
       if (!response.ok) {
@@ -462,6 +516,11 @@ export default function AdminPage() {
             <p className="mt-4 text-[#93a4bd]">
               O painel admin so abre depois do login com a conta autorizada.
             </p>
+            {message && (
+              <div className="cq-panel mt-5 border-yellow-300/40 p-3 text-sm text-yellow-100">
+                {message}
+              </div>
+            )}
             <Link href="/login" className="cq-button mt-6">
               Entrar com a conta admin
             </Link>
